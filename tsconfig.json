@@ -1,6 +1,12 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@env": ["@types/env"]
+    },
+    "noImplicitAny": false,
+    "skipLibCheck": true,
     "strict": true
   }
 }
