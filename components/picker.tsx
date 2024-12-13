@@ -3,41 +3,37 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import { useLazyQuery } from '@apollo/client';
 import { OBTENER_OPCIONES } from '../graphql/querys';
+import { CampoType } from 'types';
 
 export default function CampoSelector({ campo, formData, setFormData, disabled }: {
-  campo: {
-    nombre: string,
-    descripcion: string,
-    fuente: string,
-    parametro: string
-  },
+  campo: CampoType,
   formData: any,
   setFormData: any,
-  disabled: boolean
+  disabled: boolean,
+  handleInputChange: (campoNombre: string, value: any) => void;
 }) {
-
   const [pickerItems, setPickerItems] = useState([]);
   const [loadOpciones, { loading, error, data }] = useLazyQuery(OBTENER_OPCIONES);
 
   useEffect(() => {
-    if (campo.fuente && campo.parametro) {
+    if (campo.Fuente && campo.Parametro) {
       loadOpciones({
         variables: {
-          fuente: campo.fuente, // Asegúrate de que este valor coincide con tu backend
-          parametro: campo.parametro,  // Asegúrate de que este valor existe en tus datos
+          fuente: campo.Fuente, // Asegúrate de que este valor coincide con tu backend
+          parametro: campo.Parametro,  // Asegúrate de que este valor existe en tus datos
         },
       });
     }
-  }, [campo.fuente, campo.parametro]);
-  
+  }, [campo.Fuente, campo.Parametro]);
+
   useEffect(() => {
     if (data?.obtenerOpciones?.length) {
       const items = data.obtenerOpciones.map((opcion: {
-        label: string,
-        valor: string,
+        Label: string,
+        Valor: string,
       }) => ({
-        label: opcion.label,
-        value: opcion.valor,
+        label: opcion.Label,
+        value: opcion.Valor,
       }));
 
       setPickerItems(items);
@@ -58,21 +54,21 @@ export default function CampoSelector({ campo, formData, setFormData, disabled }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{campo.nombre}</Text>
+      <Text style={styles.label}>{campo.Nombre}</Text>
       <RNPickerSelect
         onValueChange={(value) => {
-          const seleccionado = data.obtenerOpciones.find((item: {
-            label: string,
-            valor: string
-          }) => item.valor === value);
-          setFormData((prev: any) => ({
-            ...prev,
-            [campo.nombre]: seleccionado?.datosExtra, // Guarda el objeto completo
-          }));
+          const seleccionado = data.obtenerOpciones.find((item: { Label: string; Valor: string }) => item.Valor === value);
+
+          if (seleccionado) {
+            setFormData((prev) => ({
+              ...prev,
+              [campo.Nombre]: seleccionado.datosVehiculo, // Guarda el objeto completo del vehículo
+            }));
+          }
         }}
         items={pickerItems}
-        placeholder={{ label: campo.descripcion || `Seleccione un ${campo.nombre}`, value: null }}
-        value={formData[campo.nombre]?.[campo.parametro] || null}
+        placeholder={{ label: campo.Descripcion || `${campo.Nombre}`, value: null }}
+        value={campo.Parametro ? formData[campo.Nombre]?.[campo.Parametro] : null} // Valida campo.Parametro
         style={pickerSelectStyles}
         useNativeAndroidPickerStyle={false}
         disabled={disabled} // Deshabilita el picker

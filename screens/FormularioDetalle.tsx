@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import {
     View,
@@ -13,34 +13,46 @@ import {
 import { OBTENER_FORMULARIO } from '../graphql/querys';
 import CampoSelector from 'components/Picker';
 import FirmaInput from 'components/FirmaInput';
+import { FormularioType } from 'types';
 
 const Separator = () => <View style={styles.separator} />;
 
-export default function FormularioDetalle({ route }: { route: any }) {
+interface FormularioDetalleProps {
+    route: {
+        params: {
+            id: string;
+        }
+    }
+}
+
+export default function FormularioDetalle({ route }: FormularioDetalleProps) {
     const { id } = route.params;
 
     // Consulta GraphQL para obtener el formulario por ID
-    const { loading, error, data } = useQuery(OBTENER_FORMULARIO, {
+    const { loading, error, data } = useQuery<{ obtenerFormulario: FormularioType }>(OBTENER_FORMULARIO, {
         variables: { id },
     });
 
     // Estados dinámicos para almacenar los valores del formulario
     const [formData, setFormData] = useState<Record<string, any>>({});
 
+
     // Manejar cambios en los campos
     const handleInputChange = (campoNombre: string, value: any) => {
         setFormData((prev) => {
             const nuevoFormData = { ...prev, [campoNombre]: value };
 
-            // Procesar referencias
-            categorias.forEach((categoria: any) => {
-                categoria.campos.forEach((campo: any) => {
-                    if (campo.referencia && campo.referencia.campo === campoNombre) {
-                        const valorReferenciado = value?.[campo.referencia.propiedad];
-                        nuevoFormData[campo.nombre] = valorReferenciado ?? campo.valorDefecto; // Usa el valor por defecto si la referencia es null
-                    }
+            // Procesar referencias: para cada categoría y campo, si hace referencia a este campo, actualiza su valor
+            if (formulario) {
+                formulario.categorias.forEach((categoria) => {
+                    (categoria.campos || []).forEach((campo) => { // Asegura que campos no sea null
+                        if (campo.ReferenciaCampo && campo.ReferenciaPropiedad && campo.ReferenciaCampo === campoNombre) {
+                            const valorReferenciado = value?.[campo.ReferenciaPropiedad];
+                            nuevoFormData[campo.Nombre] = valorReferenciado ?? campo.ValorDefecto;
+                        }
+                    });
                 });
-            });
+            }
 
             return nuevoFormData;
         });
@@ -64,87 +76,90 @@ export default function FormularioDetalle({ route }: { route: any }) {
 
     // Verifica que los datos existan y sean válidos
     const formulario = data?.obtenerFormulario;
-    const categorias = formulario?.campos?.categorias;
 
-    if (!formulario || !categorias) {
+    if (!formulario || !Array.isArray(formulario.categorias)) {
         return (
             <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>No se encontraron categorías en el formulario.</Text>
+                <Text style={styles.errorText}>No se encontró el formulario o sus categorías.</Text>
             </View>
         );
     }
 
+    const categorias = formulario.categorias;
+
+    // Verificación adicional de campos
+    categorias.forEach((categoria, index) => {
+        if (!Array.isArray(categoria.campos)) {
+            console.warn(`La categoría con ID ${categoria.CategoriaId} tiene campos nulos o inválidos.`);
+            categoria.campos = []; // Asigna un arreglo vacío para evitar errores
+        }
+    });
+
     const handleSubmit = () => {
         const errores: string[] = [];
-
-        // Crear una copia de formData para procesar los datos
         const processedFormData = { ...formData };
 
         // Sincronizar referencias antes de validar
-        categorias.forEach((categoria: any) => {
-            categoria.campos.forEach((campo: any) => {
-                if (campo.referencia) {
-                    const valorReferenciado = processedFormData[campo.referencia.campo]?.[campo.referencia.propiedad];
+        categorias.forEach((categoria) => {
+            categoria.campos.forEach((campo) => {
+                if (campo.ReferenciaCampo && campo.ReferenciaPropiedad) {
+                    const valorReferenciado = processedFormData[campo.ReferenciaCampo]?.[campo.ReferenciaPropiedad];
                     if (valorReferenciado !== undefined) {
-                        processedFormData[campo.nombre] = valorReferenciado;
+                        processedFormData[campo.Nombre] = valorReferenciado;
                     }
                 }
             });
         });
 
         // Validar y procesar los campos
-        categorias.forEach((categoria: any) => {
-            categoria.campos.forEach((campo: any) => {
-                let valorCampo = processedFormData[campo.nombre];
+        categorias.forEach((categoria) => {
+            categoria.campos.forEach((campo) => {
+                let valorCampo = processedFormData[campo.Nombre];
 
                 // Si el campo es de tipo selector y tiene un parámetro
-                if (campo.tipo === 'selector' && campo.parametro && valorCampo) {
-                    const parametroValor = valorCampo[campo.parametro]; // Extraer el parámetro directamente
-                    processedFormData[campo.nombre] = parametroValor; // Guardar solo el parámetro
-                    valorCampo = parametroValor; // Actualizar para validaciones
+                if (campo.Tipo === 'selector' && campo.Parametro && valorCampo) {
+                    const parametroValor = valorCampo[campo.Parametro];
+                    processedFormData[campo.Nombre] = parametroValor;
+                    valorCampo = parametroValor;
                 }
 
                 // Validar que el campo esté diligenciado
-                if (campo.requerido && (valorCampo === undefined || valorCampo === null)) {
-                    errores.push(`El campo "${campo.nombre}" de la categoría "${categoria.nombre}" es obligatorio.`);
+                if (campo.Requerido && (valorCampo === undefined || valorCampo === null || valorCampo === '')) {
+                    errores.push(`El campo "${campo.Nombre}" de la categoría "${categoria.Nombre}" es obligatorio.`);
                     return;
                 }
 
-                // Validar campos tipo "boolean"
-                if (campo.tipo === 'boolean') {
-                    if (campo.requerido && (valorCampo !== true && valorCampo !== false)) {
-                        errores.push(`Debes seleccionar una opción (Sí/No) en el campo "${campo.nombre}" de la categoría "${categoria.nombre}".`);
+                if (campo.Tipo === 'boolean') {
+                    if (campo.Requerido && (valorCampo !== true && valorCampo !== false)) {
+                        errores.push(`Debes seleccionar una opción (Sí/No) en el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}".`);
                     }
                 }
 
-                if (campo.tipo === 'check') {
-                    if (campo.requerido && valorCampo !== true) {
-                        errores.push(`Debes marcar el campo "${campo.nombre}" de la categoría "${categoria.nombre}" para continuar.`);
+                if (campo.Tipo === 'check') {
+                    if (campo.Requerido && valorCampo !== true) {
+                        errores.push(`Debes marcar el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}" para continuar.`);
                     }
                 }
 
-                // Validar campos tipo "texto"
-                if (campo.tipo === 'texto') {
-                    if (campo.requerido && (!valorCampo || valorCampo.trim() === '')) {
-                        errores.push(`Debes diligenciar el campo "${campo.nombre}" de la categoría "${categoria.nombre}".`);
+                if (campo.Tipo === 'texto') {
+                    if (campo.Requerido && (!valorCampo || valorCampo.trim() === '')) {
+                        errores.push(`Debes diligenciar el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}".`);
                     }
                 }
 
-                // Validar campos tipo "opcion"
-                if (campo.tipo === 'opcion') {
+                if (campo.Tipo === 'opcion') {
                     const opcionSeleccionada = valorCampo?.valor;
                     const textoAdicional = valorCampo?.texto;
 
-                    if (campo.requerido && !opcionSeleccionada) {
-                        errores.push(`Debes seleccionar una opción en el campo "${campo.nombre}" de la categoría "${categoria.nombre}".`);
+                    if (campo.Requerido && !opcionSeleccionada) {
+                        errores.push(`Debes seleccionar una opción en el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}".`);
                     }
 
-                    const opcion = campo.opciones?.find((o: any) => o.valor === opcionSeleccionada);
-                    if (opcion?.habilitaTexto && (!textoAdicional || textoAdicional.trim() === '')) {
-                        errores.push(`Debes diligenciar el texto adicional en el campo "${campo.nombre}" de la categoría "${categoria.nombre}".`);
+                    const opcion = campo.opciones?.find((o) => o.Valor === opcionSeleccionada);
+                    if (opcion?.HabilitaTexto && (!textoAdicional || textoAdicional.trim() === '')) {
+                        errores.push(`Debes diligenciar el texto adicional en el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}".`);
                     }
                 }
-
             });
         });
 
@@ -158,68 +173,73 @@ export default function FormularioDetalle({ route }: { route: any }) {
         console.log('Formulario enviado:', processedFormData);
     };
 
+    console.log(categorias.map(categoria => categoria.campos.map(campo => console.log(campo))))
+
     return (
         <ScrollView contentContainerStyle={styles.container}>
-            <Text style={styles.title}>{formulario.nombre}</Text>
-            <Text>{formulario.descripcion}</Text>
+            <Text style={styles.title}>{formulario.Nombre}</Text>
+            {formulario.Descripcion && <Text>{formulario.Descripcion}</Text>}
 
-            {categorias.map((categoria: any, index: number) => (
-                <View key={index} style={styles.categoryContainer}>
-                    <Text style={styles.categoryTitle}>{categoria.nombre}</Text>
-                    {categoria.campos.map((campo: any, campoIndex: number) => (
-                        <View key={campoIndex} style={styles.fieldContainer}>
+            {categorias.map((categoria, indexCategoria) => (
+                <View key={categoria.CategoriaId} style={styles.categoryContainer}>
+                    <Text style={styles.categoryTitle}>{categoria.Nombre}</Text>
+                    {categoria.Descripcion && <Text style={styles.CategoryDescription}>{categoria.Descripcion}</Text>}
 
-                            {campo.tipo === 'selector' && (
+                    {(categoria.campos || []).map((campo) => (
+                        <View key={campo.CampoId} style={styles.fieldContainer}>
+
+                            {campo.Tipo === 'selector' && (
                                 <CampoSelector
                                     campo={campo}
                                     formData={formData}
                                     setFormData={setFormData}
-                                    disabled={!!campo.referencia} // Deshabilitar si tiene referencia
+                                    disabled={!!campo.ReferenciaCampo}
+                                    handleInputChange={handleInputChange}
                                 />
                             )}
 
-                            {campo.tipo === 'boolean' && (
+                            {campo.Tipo === 'boolean' && (
                                 <View>
-                                    <Text style={[styles.fieldLabel, campo.referencia && styles.disabledLabel]}>
-                                        {campo.nombre}
+                                    <Text style={[styles.fieldLabel, campo.ReferenciaCampo && styles.disabledLabel]}>
+                                        {campo.Nombre}
                                     </Text>
-                                    <View style={[styles.booleanContainer, campo.referencia && styles.disabledContainer]}>
+                                    <View style={[styles.booleanContainer, campo.ReferenciaCampo && styles.disabledContainer]}>
                                         <TouchableOpacity
                                             style={[
                                                 styles.booleanOption,
-                                                formData[campo.nombre] === true && styles.booleanOptionSelected,
-                                                campo.referencia && styles.booleanOptionDisabled,
+                                                formData[campo.Nombre] === true && styles.booleanOptionSelected,
+                                                campo.ReferenciaCampo && styles.booleanOptionDisabled,
                                             ]}
-                                            onPress={() => !campo.referencia && handleInputChange(campo.nombre, true)}
-                                            disabled={!!campo.referencia}
+                                            onPress={() => !campo.ReferenciaCampo && handleInputChange(campo.Nombre, true)}
+                                            disabled={!!campo.ReferenciaCampo}
                                         >
                                             <Text
                                                 style={[
                                                     styles.booleanText,
-                                                    formData[campo.nombre] === true && styles.booleanTextSelected,
-                                                    campo.referencia && styles.booleanTextDisabled,
+                                                    formData[campo.Nombre] === true && styles.booleanTextSelected,
+                                                    campo.ReferenciaCampo && styles.booleanTextDisabled,
                                                 ]}
                                             >
-                                                {campo.opcionTrue || 'Sí'}
+                                                {campo.OpcionTrue || 'Sí'}
                                             </Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[
                                                 styles.booleanOption,
-                                                formData[campo.nombre] === false && styles.booleanOptionSelected,
-                                                campo.referencia && styles.booleanOptionDisabled,
+                                                formData[campo.Nombre] === false && styles.booleanOptionSelected,
+                                                campo.ReferenciaCampo && styles.booleanOptionDisabled,
                                             ]}
-                                            onPress={() => !campo.referencia && handleInputChange(campo.nombre, false)}
-                                            disabled={!!campo.referencia}
+                                            onPress={() => !campo.ReferenciaCampo && handleInputChange(campo.Nombre, false)}
+                                            disabled={!!campo.ReferenciaCampo}
                                         >
                                             <Text
                                                 style={[
                                                     styles.booleanText,
-                                                    formData[campo.nombre] === false && styles.booleanTextSelected,
-                                                    campo.referencia && styles.booleanTextDisabled,
+                                                    formData[campo.Nombre] === false && styles.booleanTextSelected,
+                                                    campo.ReferenciaCampo && styles.booleanTextDisabled,
                                                 ]}
                                             >
-                                                {campo.opcionFalse || 'No'}
+                                                {campo.OpcionFalse || 'No'}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -227,148 +247,147 @@ export default function FormularioDetalle({ route }: { route: any }) {
                             )}
 
 
-                            {campo.tipo === 'texto' && (
+                            {campo.Tipo === 'texto' && (
                                 <View>
-                                    <Text style={styles.fieldLabel}>{campo.nombre}</Text>
+                                    <Text style={styles.fieldLabel}>{campo.Nombre}</Text>
                                     <TextInput
                                         style={[
                                             styles.textInput,
-                                            campo.referencia && styles.textInputDisabled, // Agrega estilo deshabilitado si hay referencia
+                                            campo.ReferenciaCampo && styles.textInputDisabled,
                                         ]}
-                                        placeholder={campo.placeholder || 'Escribe aquí...'}
+                                        placeholder={campo.Placeholder || 'Escribe aquí...'}
                                         value={
-                                            campo.referencia
-                                                ? formData[campo.referencia.campo]?.[campo.referencia.propiedad] ??
-                                                campo.valorDefecto // Mostrar valorDefecto si la referencia es null o undefined
-                                                : formData[campo.nombre] || campo.valorDefecto || '' // Usar valorDefecto si no hay dato ingresado
+                                            campo.ReferenciaCampo && campo.ReferenciaPropiedad
+                                                ? formData[campo.ReferenciaCampo]?.[campo.ReferenciaPropiedad] ?? campo.ValorDefecto ?? ''
+                                                : formData[campo.Nombre] || campo.ValorDefecto || ''
                                         }
-                                        editable={!campo.referencia}
+                                        onChangeText={(value) => !campo.ReferenciaCampo && handleInputChange(campo.Nombre, value)}
+                                        editable={!campo.ReferenciaCampo}
                                     />
                                 </View>
                             )}
 
-
-                            {campo.tipo === 'number' && (
+                            {campo.Tipo === 'number' && (
                                 <View>
-                                    <Text style={[styles.fieldLabel, campo.referencia && styles.disabledLabel]}>
-                                        {campo.nombre}
+                                    <Text style={[styles.fieldLabel, campo.ReferenciaCampo && styles.disabledLabel]}>
+                                        {campo.Nombre}
                                     </Text>
                                     <TextInput
                                         style={[
                                             styles.numberInput,
-                                            campo.referencia && styles.textInputDisabled,
+                                            campo.ReferenciaCampo && styles.textInputDisabled,
                                         ]}
-                                        placeholder={campo.placeholder || 'Ingrese un valor numérico'}
+                                        placeholder={campo.Placeholder || 'Ingrese un valor numérico'}
                                         keyboardType="numeric"
                                         value={
-                                            campo.referencia
-                                                ? formData[campo.referencia.campo]?.[campo.referencia.propiedad]?.toString() || ''
-                                                : formData[campo.nombre]?.toString() || ''
+                                            campo.ReferenciaCampo && campo.ReferenciaPropiedad
+                                                ? formData[campo.ReferenciaCampo]?.[campo.ReferenciaPropiedad]?.toString() || ''
+                                                : formData[campo.Nombre]?.toString() || ''
                                         }
                                         onChangeText={(value) =>
-                                            !campo.referencia &&
-                                            handleInputChange(campo.nombre, value ? parseFloat(value) : '')
+                                            !campo.ReferenciaCampo && handleInputChange(campo.Nombre, value ? parseFloat(value) : '')
                                         }
-                                        editable={!campo.referencia}
+                                        editable={!campo.ReferenciaCampo}
                                     />
                                 </View>
                             )}
 
-                            {campo.tipo === 'opcion' && (
+                            {campo.Tipo === 'opcion' && (
                                 <View>
-                                    <Text style={[styles.fieldLabel, campo.referencia && styles.disabledLabel]}>
-                                        {campo.nombre}
+                                    {/* Título del Campo */}
+                                    <Text style={[styles.fieldLabel, campo.ReferenciaCampo && styles.disabledLabel]}>
+                                        {campo.Nombre}
                                     </Text>
-                                    {campo.opciones?.map((opcion: any, opcionIndex: number) => (
+
+                                    {/* Opciones como Botones */}
+                                    {campo.opciones?.map((opcion, opcionIndex) => (
                                         <TouchableOpacity
                                             key={opcionIndex}
                                             style={[
                                                 styles.optionButton,
-                                                formData[campo.nombre]?.valor === opcion.valor && styles.optionSelected,
-                                                campo.referencia && styles.optionButtonDisabled,
+                                                formData[campo.Nombre]?.valor === opcion.Valor && styles.optionSelected,
+                                                campo.ReferenciaCampo && styles.optionButtonDisabled,
                                             ]}
                                             onPress={() =>
-                                                !campo.referencia &&
-                                                handleInputChange(campo.nombre, {
-                                                    valor: opcion.valor,
-                                                    texto: formData[campo.nombre]?.valor === opcion.valor ? formData[campo.nombre]?.texto : '', // Mantén el texto si ya existe
+                                                !campo.ReferenciaCampo &&
+                                                handleInputChange(campo.Nombre, {
+                                                    valor: opcion.Valor,
+                                                    texto: formData[campo.Nombre]?.valor === opcion.Valor ? formData[campo.Nombre]?.texto : '',
                                                 })
                                             }
-                                            disabled={!!campo.referencia}
+                                            disabled={!!campo.ReferenciaCampo}
                                         >
                                             <Text
                                                 style={[
-                                                    formData[campo.nombre]?.valor === opcion.valor && styles.optionTextSelected,
-                                                    campo.referencia && styles.optionTextDisabled,
+                                                    formData[campo.Nombre]?.valor === opcion.Valor && styles.optionTextSelected,
+                                                    campo.ReferenciaCampo && styles.optionTextDisabled,
                                                 ]}
                                             >
-                                                {opcion.valor}
+                                                {opcion.Valor}
                                             </Text>
                                         </TouchableOpacity>
                                     ))}
 
-                                    {formData[campo.nombre]?.valor &&
-                                        campo.opciones.find((o: any) => o.valor === formData[campo.nombre]?.valor)?.habilitaTexto && (
+                                    {/* TextInput Condicional */}
+                                    {(() => {
+                                        const opcionSeleccionada = campo.opciones?.find(
+                                            (o) => o.Valor === formData[campo.Nombre]?.valor
+                                        );
+
+                                        return opcionSeleccionada?.HabilitaTexto ? (
                                             <TextInput
                                                 style={styles.textInput}
-                                                placeholder={
-                                                    campo.opciones.find((o: any) => o.valor === formData[campo.nombre]?.valor)?.placeholder ||
-                                                    'Escribe aquí...'
-                                                }
+                                                placeholder={opcionSeleccionada.Placeholder || 'Escribe aquí...'}
                                                 keyboardType={
-                                                    campo.opciones.find((o: any) => o.valor === formData[campo.nombre]?.valor)?.tipoTexto === 'number'
-                                                        ? 'numeric'
-                                                        : 'default'
+                                                    opcionSeleccionada.TipoTexto === 'number' ? 'numeric' : 'default'
                                                 }
-                                                value={formData[campo.nombre]?.texto || ''}
+                                                value={formData[campo.Nombre]?.texto || ''}
                                                 onChangeText={(value) =>
-                                                    handleInputChange(campo.nombre, {
-                                                        ...formData[campo.nombre],
+                                                    handleInputChange(campo.Nombre, {
+                                                        ...formData[campo.Nombre],
                                                         texto: value,
                                                     })
                                                 }
                                             />
-                                        )}
+                                        ) : null;
+                                    })()}
                                 </View>
                             )}
 
 
-                            {campo.tipo === 'check' && (
-                                <View style={[styles.checkboxContainer, campo.referencia && styles.disabledContainer]}>
+                            {campo.Tipo === 'check' && (
+                                <View style={[styles.checkboxContainer, campo.ReferenciaCampo && styles.disabledContainer]}>
                                     <TouchableOpacity
                                         style={[
                                             styles.customCheckbox,
-                                            formData[campo.nombre] && styles.customCheckboxSelected,
-                                            campo.referencia && styles.customCheckboxDisabled,
+                                            formData[campo.Nombre] && styles.customCheckboxSelected,
+                                            campo.ReferenciaCampo && styles.customCheckboxDisabled,
                                         ]}
-                                        onPress={() => !campo.referencia && handleInputChange(campo.nombre, !formData[campo.nombre])}
-                                        disabled={!!campo.referencia}
+                                        onPress={() => !campo.ReferenciaCampo && handleInputChange(campo.Nombre, !formData[campo.Nombre])}
+                                        disabled={!!campo.ReferenciaCampo}
                                     >
-                                        {formData[campo.nombre] && <View style={styles.customCheckboxInner} />}
+                                        {formData[campo.Nombre] && <View style={styles.customCheckboxInner} />}
                                     </TouchableOpacity>
-                                    <Text style={[styles.checkboxLabel, campo.referencia && styles.disabledLabel]}>
-                                        {campo.nombre}
+                                    <Text style={[styles.checkboxLabel, campo.ReferenciaCampo && styles.disabledLabel]}>
+                                        {campo.Nombre}
                                     </Text>
                                 </View>
                             )}
 
-
-
-                            {campo.tipo === 'firma' && (
+                            {campo.Tipo === 'firma' && (
                                 <View>
-                                    <Text style={campo.referencia && styles.disabledLabel}>
-                                        {campo.nombre}
+                                    <Text style={campo.ReferenciaCampo && styles.disabledLabel}>
+                                        {campo.Nombre}
                                     </Text>
                                     <FirmaInput
                                         text="Por favor, firme aquí"
-                                        onOK={(signature) => handleInputChange(campo.nombre, signature)}
+                                        onOK={(signature) => handleInputChange(campo.Nombre, signature)}
                                     />
-
                                 </View>
                             )}
                         </View>
                     ))}
-                    {index + 1 !== categorias.length && <Separator />}
+                    {indexCategoria + 1 !== categorias.length && <Separator />}
                 </View>
             ))}
 
@@ -379,14 +398,12 @@ export default function FormularioDetalle({ route }: { route: any }) {
                 <Text style={styles.buttonSubmitText}>Enviar respuestas</Text>
             </TouchableOpacity>
         </ScrollView>
-
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         padding: 20,
-        paddingBottom: 120,
         backgroundColor: '#fff',
     },
     title: {
@@ -412,19 +429,23 @@ const styles = StyleSheet.create({
     categoryContainer: {
         marginVertical: 20,
         backgroundColor: '#ffffff',
-        shadowColor: '#000', // Color de la sombra
+        shadowColor: '#000',
     },
     categoryTitle: {
         fontSize: 16,
         fontWeight: 'bold',
         marginBottom: 10,
     },
+    CategoryDescription: {
+        marginBottom: 20,
+        color: '#a0a0a0'
+    },
     fieldContainer: {
         marginBottom: 15,
     },
     fieldLabel: {
         fontSize: 14,
-        marginBottom: 5,
+        marginBottom: 10,
     },
     textInput: {
         borderWidth: 1,
@@ -443,14 +464,15 @@ const styles = StyleSheet.create({
     },
     booleanContainer: {
         flexDirection: 'row',
+        gap: 20
     },
     booleanOption: {
         flex: 1,
         padding: 10,
+        paddingVertical: 20,
         alignItems: 'center',
         borderRadius: 5,
         backgroundColor: '#ececec',
-        marginHorizontal: 5,
     },
     booleanOptionSelected: {
         backgroundColor: '#2E8B57',
@@ -473,9 +495,6 @@ const styles = StyleSheet.create({
     optionSelected: {
         backgroundColor: '#2E8B57',
     },
-    optionText: {
-        color: '#000',
-    },
     optionTextSelected: {
         color: '#fff',
     },
@@ -488,32 +507,30 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 10, // Espaciado para el texto al lado del checkbox
+        marginRight: 10,
     },
     customCheckboxSelected: {
-        backgroundColor: '#2E8B57', // Color cuando está seleccionado
+        backgroundColor: '#2E8B57',
         borderColor: '#2E8B57',
     },
     customCheckboxInner: {
         width: 14,
         height: 14,
-        backgroundColor: '#fff', // Color del indicador interno
+        backgroundColor: '#fff',
     },
     checkboxLabel: {
         fontSize: 14,
-        flexWrap: 'wrap', // Permite el salto de línea
-        textAlign: 'left', // Alineación del texto
+        flexWrap: 'wrap',
+        textAlign: 'left',
     },
     checkboxContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 15,
-        width: '90%', // Ancho máximo del contenedor
+        width: '90%',
     },
-    imageSelectedText: {
-        marginTop: 10,
-        fontSize: 12,
-        color: '#666',
+    customCheckboxDisabled: {
+        backgroundColor: '#ccc'
     },
     separator: {
         marginVertical: 8,
@@ -530,29 +547,23 @@ const styles = StyleSheet.create({
         textAlign: 'center'
     },
     textInputDisabled: {
-        backgroundColor: '#f2f2f2', // Fondo para campos deshabilitados
+        backgroundColor: '#f2f2f2',
         borderColor: '#ccc',
         borderWidth: 1,
         padding: 10,
         borderRadius: 5,
-        color: '#a0a0a0', // Texto para campos deshabilitados
+        color: '#a0a0a0',
     },
-    pickerDisabled: {
-        backgroundColor: '#f2f2f2', // Fondo para pickers deshabilitados
-        borderColor: '#ccc',
-        borderWidth: 1,
-        borderRadius: 5,
+    disabledLabel: {
+        color: '#a0a0a0',
     },
-    checkboxDisabled: {
-        backgroundColor: '#f2f2f2', // Fondo para checkboxes deshabilitados
-        borderRadius: 5,
-    },
-    checkboxLabelDisabled: {
-        color: '#a0a0a0', // Color del texto para etiquetas de checkboxes deshabilitados
-    },
-    customCheckboxDisabled: {
+    disabledContainer: {
         backgroundColor: '#f2f2f2',
+        padding: 10,
+        borderRadius: 5,
+        borderWidth: 1,
         borderColor: '#e0e0e0',
+        opacity: 0.6,
     },
     booleanOptionDisabled: {
         backgroundColor: '#f2f2f2',
@@ -561,22 +572,11 @@ const styles = StyleSheet.create({
     booleanTextDisabled: {
         color: '#a0a0a0',
     },
-    disabledLabel: {
-        color: '#a0a0a0',
-    },
-    disabledContainer: {
-        backgroundColor: '#f2f2f2', // Fondo gris claro para indicar que está deshabilitado
-        padding: 10,
-        borderRadius: 5,
-        borderWidth: 1,
-        borderColor: '#e0e0e0', // Bordes más claros para diferenciar visualmente
-        opacity: 0.6, // Reduce la opacidad para reforzar el estado deshabilitado
-    },
     optionTextDisabled: {
         color: '#a0a0a0',
     },
     optionButtonDisabled: {
         backgroundColor: '#f2f2f2',
         borderColor: '#e0e0e0',
-    },
+    }
 });

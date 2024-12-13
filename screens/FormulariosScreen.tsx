@@ -26,13 +26,17 @@ export default function FormulariosScreen() {
     <ScrollView>
       <HeaderLayout screen={'Formularios'}/>
       <View style={styles.container}>
-        {formularios.map((formulario: Formulario) => (
-          <CardFormulario
-            key={formulario.id}
-            formulario={formulario}
-            onPress={() => navigation.navigate("Detalles del formulario", { id: formulario.id })}
-          />
-        ))}
+        {formularios.length > 0 ? (
+          formularios.map((formulario: Formulario) => (
+            <CardFormulario
+              key={formulario.FormularioId}
+              formulario={formulario}
+              onPress={() => navigation.navigate("Detalles del formulario", { id: formulario.FormularioId })}
+            />
+          ))
+        ) : (
+          <Text>No hay formularios disponibles por el momento</Text>
+        )}
       </View>
     </ScrollView>
   );

@@ -16,33 +16,57 @@ export const OBTENER_USUARIO = gql`
 
 export const OBTENER_FORMULARIOS = gql`
   query ObtenerFormularios {
-    obtenerFormularios {
-      id
-      nombre
-      descripcion
-      campos
-    }
+  obtenerFormularios {
+    FormularioId
+    Nombre
+    Descripcion
   }
+}
 `;
 
 export const OBTENER_FORMULARIO = gql`
   query ObtenerFormulario($id: ID!) {
-  obtenerFormulario(id: $id) {
-    id
-    nombre
-    descripcion
-    campos
+    obtenerFormulario(id: $id) {
+      FormularioId
+      Nombre
+      Descripcion
+      categorias { # Debe coincidir con el alias 'categorias'
+        CategoriaId
+        Nombre
+        Descripcion
+        campos { 
+          CampoId
+          Nombre
+          Tipo
+          Requerido
+          Placeholder
+          ValorDefecto
+          Fuente
+          Parametro
+          OpcionTrue
+          OpcionFalse
+          ReferenciaCampo
+          ReferenciaPropiedad
+          Descripcion
+          opciones {
+              OpcionId
+              Valor
+              HabilitaTexto
+              TipoTexto
+              Placeholder
+          }
+        }
+      }
+    }
   }
-}
-
 `;
 
 export const OBTENER_OPCIONES = gql`
   query ObtenerOpciones($fuente: String!, $parametro: String!) {
     obtenerOpciones(fuente: $fuente, parametro: $parametro) {
-      valor
-      label
-      datosExtra
+      Valor
+      Label
+      datosVehiculo
     }
   }
 `;
