@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableWithoutFeedback, Animated } from 'react-native';
+import { Text, StyleSheet, TouchableWithoutFeedback, Animated } from 'react-native';
 import { Formulario } from 'types';
 
 type CardProps = {
@@ -31,8 +31,8 @@ export const CardFormulario: React.FC<CardProps> = ({ formulario, onPress }) => 
       onPress={onPress}
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-        <Text style={styles.title}>{formulario.nombre}</Text>
-        <Text style={styles.description}>{formulario.descripcion}</Text>
+        <Text style={styles.title}>{formulario.Nombre}</Text>
+        <Text style={styles.description}>{formulario.Descripcion}</Text>
       </Animated.View>
     </TouchableWithoutFeedback>
   );

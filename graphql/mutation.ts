@@ -30,3 +30,17 @@ export const CAMBIAR_PASSWORD = gql`
   }
 `;
 
+export const REGISTRAR_RESPUESTA_FORMULARIO = gql`
+  mutation RegistrarRespuesta($input: RespuestaFormularioInput!) {
+    registrarRespuesta(input: $input) {
+      RespuestaFormularioId
+      FormularioId
+      UsuarioId
+      detalles {
+        RespuestaDetalleId
+        CampoId
+        valor
+      }
+    }
+  }
+`
