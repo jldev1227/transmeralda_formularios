@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import SignatureScreen from "react-native-signature-canvas";
 
-const FirmaInput = ({ text = "Firma aquí", onOK }) => {
+const FirmaInput = ({ text, onOK }) => {
   const ref = useRef();
   const [modalVisible, setModalVisible] = useState(false);
   const [signaturePreview, setSignaturePreview] = useState(null); // Estado para la previsualización de la firma
@@ -57,7 +57,7 @@ const FirmaInput = ({ text = "Firma aquí", onOK }) => {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <Text style={styles.title}>Por favor, firme aquí</Text>
+          <Text style={styles.title}>{text}</Text>
           <SignatureScreen
             ref={ref}
             onOK={handleOK} // Callback cuando la firma está lista

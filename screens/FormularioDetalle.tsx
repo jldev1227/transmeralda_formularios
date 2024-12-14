@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useQuery } from '@apollo/client';
+import React, { useState } from 'react';
+import { useMutation, useQuery } from '@apollo/client';
 import {
     View,
     Text,
@@ -14,6 +14,8 @@ import { OBTENER_FORMULARIO } from '../graphql/querys';
 import CampoSelector from 'components/Picker';
 import FirmaInput from 'components/FirmaInput';
 import { FormularioType } from 'types';
+import { REGISTRAR_RESPUESTA_FORMULARIO } from 'graphql/mutation';
+import { useAuth } from 'context/AuthContext';
 
 const Separator = () => <View style={styles.separator} />;
 
@@ -34,8 +36,9 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
     });
 
     // Estados dinámicos para almacenar los valores del formulario
+    const { state } = useAuth()
     const [formData, setFormData] = useState<Record<string, any>>({});
-
+    const [registrarRespuesta] = useMutation(REGISTRAR_RESPUESTA_FORMULARIO);
 
     // Manejar cambios en los campos
     const handleInputChange = (campoNombre: string, value: any) => {
@@ -95,7 +98,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
         }
     });
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const errores: string[] = [];
         const processedFormData = { ...formData };
 
@@ -128,38 +131,6 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                     errores.push(`El campo "${campo.Nombre}" de la categoría "${categoria.Nombre}" es obligatorio.`);
                     return;
                 }
-
-                if (campo.Tipo === 'boolean') {
-                    if (campo.Requerido && (valorCampo !== true && valorCampo !== false)) {
-                        errores.push(`Debes seleccionar una opción (Sí/No) en el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}".`);
-                    }
-                }
-
-                if (campo.Tipo === 'check') {
-                    if (campo.Requerido && valorCampo !== true) {
-                        errores.push(`Debes marcar el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}" para continuar.`);
-                    }
-                }
-
-                if (campo.Tipo === 'texto') {
-                    if (campo.Requerido && (!valorCampo || valorCampo.trim() === '')) {
-                        errores.push(`Debes diligenciar el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}".`);
-                    }
-                }
-
-                if (campo.Tipo === 'opcion') {
-                    const opcionSeleccionada = valorCampo?.valor;
-                    const textoAdicional = valorCampo?.texto;
-
-                    if (campo.Requerido && !opcionSeleccionada) {
-                        errores.push(`Debes seleccionar una opción en el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}".`);
-                    }
-
-                    const opcion = campo.opciones?.find((o) => o.Valor === opcionSeleccionada);
-                    if (opcion?.HabilitaTexto && (!textoAdicional || textoAdicional.trim() === '')) {
-                        errores.push(`Debes diligenciar el texto adicional en el campo "${campo.Nombre}" de la categoría "${categoria.Nombre}".`);
-                    }
-                }
             });
         });
 
@@ -169,11 +140,41 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
             return;
         }
 
-        // Si no hay errores, enviar el formulario
-        console.log('Formulario enviado:', processedFormData);
+        // Transformar los datos al formato requerido por el mutation
+        const detalles = Object.entries(processedFormData).map(([campoNombre, valor]) => {
+            const campo = categorias
+                .flatMap((categoria) => categoria.campos)
+                .find((c) => c.Nombre === campoNombre);
+
+            return {
+                CampoId: campo?.CampoId,
+                valor: valor !== null && valor !== undefined ? String(valor) : null, // Convertir a String
+            };
+        });
+
+        console.log(formulario.FormularioId)
+
+        const input = {
+            FormularioId: formulario.FormularioId,
+            UsuarioId: state.usuario?.id, // Cambiar por el ID del usuario actual
+            detalles: detalles.map((detalle) => ({
+                CampoId: detalle.CampoId,
+                valor: typeof detalle.valor === "object"
+                    ? JSON.stringify(detalle.valor)
+                    : detalle.valor?.toString(), // Convertir a cadena
+            }))
+        }
+
+        try {
+            // Llamar al mutation
+            await registrarRespuesta({ variables: { input } });
+            Alert.alert('Éxito', 'Las respuestas han sido registradas exitosamente.', [{ text: 'Aceptar' }]);
+        } catch (error) {
+            console.error('Error al registrar las respuestas:', error);
+            Alert.alert('Error', 'Hubo un problema al registrar las respuestas. Inténtalo de nuevo.', [{ text: 'Aceptar' }]);
+        }
     };
 
-    console.log(categorias.map(categoria => categoria.campos.map(campo => console.log(campo))))
 
     return (
         <ScrollView contentContainerStyle={styles.container}>
@@ -380,7 +381,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                         {campo.Nombre}
                                     </Text>
                                     <FirmaInput
-                                        text="Por favor, firme aquí"
+                                        text={campo.Placeholder || 'Por favor, firme aquí'}
                                         onOK={(signature) => handleInputChange(campo.Nombre, signature)}
                                     />
                                 </View>
