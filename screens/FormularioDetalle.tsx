@@ -541,16 +541,16 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                             // Buscar coincidencia exacta con el valor seleccionado
                             let opcionElegida = campo.opciones?.find((o) => o.Valor === valorSeleccionado);
                         
-                            // Si no hay coincidencia exacta, buscar una opción con HabilitaTexto: true
-                            if (!opcionElegida && valorSeleccionado) {
+                            // Si no hay coincidencia exacta y el modo es 'enviado', buscar una opción con HabilitaTexto: true
+                            if (!opcionElegida && valorSeleccionado && modo === 'enviado') {
                                 opcionElegida = campo.opciones?.find((o) => o.HabilitaTexto);
                             }
                         
                             // Determinar si se debe mostrar el TextInput
                             const mostrarTextInput =
-                                opcionElegida?.HabilitaTexto &&
-                                (!opcionElegida || opcionElegida.Valor !== valorSeleccionado);
-                        
+                                modo === 'enviado'
+                                    ? opcionElegida?.HabilitaTexto && (!opcionElegida || opcionElegida.Valor !== valorSeleccionado)
+                                    : opcionElegida?.HabilitaTexto;
                         
                             return (
                                 <View key={campo.CampoId} style={styles.fieldContainer}>
@@ -559,9 +559,11 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                     {/* Render de las opciones */}
                                     {campo.opciones?.map((opcion, opcionIndex) => {
                                         // Verificar si esta opción está seleccionada
-
-                                        console.log(opcion)
-                                        const opcionSeleccionada = opcion.Valor === valorSeleccionado || opcion.HabilitaTexto && valorSeleccionado !== opcionElegida?.Valor;
+                                        const opcionSeleccionada =
+                                            modo === 'enviado'
+                                                ? opcion.Valor === valorSeleccionado ||
+                                                  (opcion.HabilitaTexto && valorSeleccionado !== opcionElegida?.Valor)
+                                                : opcion.Valor === valorSeleccionado;
                         
                                         return (
                                             <TouchableOpacity
@@ -617,7 +619,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                 </View>
                             );
                         }
-                                                 
+                                           
 
                         if (campo.Tipo === 'check') {
                             // 1. Detectar si es boolean true o string "true"
