@@ -20,6 +20,7 @@ export const OBTENER_FORMULARIOS = gql`
     FormularioId
     Nombre
     Descripcion
+    Imagen
   }
 }
 `;
@@ -30,7 +31,7 @@ export const OBTENER_FORMULARIO = gql`
       FormularioId
       Nombre
       Descripcion
-      categorias { # Debe coincidir con el alias 'categorias'
+      categorias {
         CategoriaId
         Nombre
         Descripcion
@@ -60,6 +61,32 @@ export const OBTENER_FORMULARIO = gql`
     }
   }
 `;
+
+export const OBTENER_RESPUESTAS_POR_USUARIO = gql`
+  query obtenerRespuestasPorUsuario($UsuarioId: ID!) {
+    obtenerRespuestasPorUsuario(UsuarioId: $UsuarioId) {
+      RespuestaFormularioId
+      FormularioId
+      UsuarioId
+      formulario {
+        FormularioId
+        Nombre
+        Descripcion
+        Imagen
+      }
+      detalles {
+        RespuestaDetalleId
+        RespuestaFormularioId
+        CampoId
+        Valor
+        campo {
+          CampoId
+          Nombre
+        }
+      }
+    }
+  }
+`
 
 export const OBTENER_OPCIONES = gql`
   query ObtenerOpciones($fuente: String!, $parametro: String!) {

@@ -3,7 +3,6 @@ import * as React from "react";
 import Svg, { Path } from "react-native-svg";
 
 function FormIcon(fill : any) {
-    console.log(fill)
   return (
     <Svg
       viewBox="0 0 1024 1024"

@@ -1,52 +1,64 @@
 import React, { useState } from 'react';
-import { Image, View } from 'react-native';
-import { Text, StyleSheet, TouchableWithoutFeedback, Animated } from 'react-native';
-import { Formulario } from 'types';
+import { Text, StyleSheet, TouchableWithoutFeedback, Animated, Image, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native'; // <-- Importar
+import { RespuestaFormulario } from 'types';
 import { images } from 'utils/images';
-import IconClipboardOutline from './IconClipboardOutline';
+import IconCheckmarkCircle from './IconCheckmarkCircle';
 
 type CardProps = {
-  formulario: Formulario;
-  onPress: () => void;
+  respuesta: RespuestaFormulario;
 };
 
-export const CardFormulario: React.FC<CardProps> = ({ formulario, onPress }) => {
+export const CardFormularioRespuesta: React.FC<CardProps> = ({ respuesta }) => {
+  const navigation = useNavigation(); // <-- Hook de navegación
   const [scale] = useState(new Animated.Value(1)); // Estado inicial de la escala
 
   const handlePressIn = () => {
     Animated.spring(scale, {
-      toValue: 0.95, // Reduce ligeramente el tamaño
+      toValue: 0.95,
       useNativeDriver: true,
     }).start();
   };
 
   const handlePressOut = () => {
     Animated.spring(scale, {
-      toValue: 1, // Restaura el tamaño original
+      toValue: 1,
       useNativeDriver: true,
     }).start();
+  };
+
+  // Aquí envías cualquier información que requieras
+  const handlePress = () => {
+    navigation.navigate('Detalles del formulario', {
+      id: respuesta.formulario.FormularioId,
+      nombre: respuesta.formulario.Nombre,
+      descripcion: respuesta.formulario.Descripcion,
+      // puedes pasar incluso 'detalles' o lo que sea necesario:
+      detalles: respuesta.detalles,
+      modo: 'enviado'
+    });
   };
 
   return (
     <TouchableWithoutFeedback
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      onPress={onPress}
+      onPress={handlePress}
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
         <Image
-          source={images[formulario.Imagen]}
+          source={images[respuesta.formulario.Imagen]}
           style={styles.image}
         />
         <View style={styles.textContainer}>
           <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
-            {formulario.Nombre}
+            {respuesta.formulario.Nombre}
           </Text>
           <Text style={styles.description} numberOfLines={2} ellipsizeMode="tail">
-            {formulario.Descripcion}
+            {respuesta.formulario.Descripcion}
           </Text>
         </View>
-        <IconClipboardOutline/>
+        <IconCheckmarkCircle />
       </Animated.View>
     </TouchableWithoutFeedback>
   );
@@ -59,9 +71,9 @@ const styles = StyleSheet.create({
     gap: 20,
     padding: 20,
     backgroundColor: '#fff',
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
-    alignItems: 'center'
   },
   image: {
     width: 54,
@@ -69,8 +81,8 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   textContainer: {
-    flex: 1, // Ocupa el espacio restante
-    flexShrink: 1, // Se ajusta si el espacio es insuficiente
+    flex: 1,
+    flexShrink: 1,
     justifyContent: 'center',
   },
   title: {
@@ -85,4 +97,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CardFormulario;
+export default CardFormularioRespuesta;

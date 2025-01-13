@@ -1,28 +1,30 @@
+// CardBorrador.tsx
 import React, { useState } from 'react';
-import { Image, View } from 'react-native';
-import { Text, StyleSheet, TouchableWithoutFeedback, Animated } from 'react-native';
-import { Formulario } from 'types';
+import { Animated, Image, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
 import { images } from 'utils/images';
-import IconClipboardOutline from './IconClipboardOutline';
+import IconBorrador from './IconBorrador';
 
-type CardProps = {
-  formulario: Formulario;
-  onPress: () => void;
-};
+interface CardBorradorProps {
+  nombre: string;
+  descripcion: string;
+  imagen: string | null;
+  item: any
+  onPress?: () => void; // Función opcional a ejecutar al pulsar
+}
 
-export const CardFormulario: React.FC<CardProps> = ({ formulario, onPress }) => {
-  const [scale] = useState(new Animated.Value(1)); // Estado inicial de la escala
+export default function CardBorrador({ nombre, descripcion, imagen, onPress }: CardBorradorProps) {
+  const [scale] = useState(new Animated.Value(1));
 
   const handlePressIn = () => {
     Animated.spring(scale, {
-      toValue: 0.95, // Reduce ligeramente el tamaño
+      toValue: 0.95,
       useNativeDriver: true,
     }).start();
   };
 
   const handlePressOut = () => {
     Animated.spring(scale, {
-      toValue: 1, // Restaura el tamaño original
+      toValue: 1,
       useNativeDriver: true,
     }).start();
   };
@@ -31,26 +33,23 @@ export const CardFormulario: React.FC<CardProps> = ({ formulario, onPress }) => 
     <TouchableWithoutFeedback
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      onPress={onPress}
+      onPress={onPress} // Usa la prop onPress
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-        <Image
-          source={images[formulario.Imagen]}
-          style={styles.image}
-        />
+        <Image source={images[imagen ?? '']} style={styles.image} />
         <View style={styles.textContainer}>
           <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
-            {formulario.Nombre}
+            {nombre}
           </Text>
           <Text style={styles.description} numberOfLines={2} ellipsizeMode="tail">
-            {formulario.Descripcion}
+            {descripcion}
           </Text>
         </View>
-        <IconClipboardOutline/>
+        <IconBorrador />
       </Animated.View>
     </TouchableWithoutFeedback>
   );
-};
+}
 
 const styles = StyleSheet.create({
   card: {
@@ -61,7 +60,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   image: {
     width: 54,
@@ -69,8 +68,8 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   textContainer: {
-    flex: 1, // Ocupa el espacio restante
-    flexShrink: 1, // Se ajusta si el espacio es insuficiente
+    flex: 1,
+    flexShrink: 1,
     justifyContent: 'center',
   },
   title: {
@@ -84,5 +83,3 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 });
-
-export default CardFormulario;

@@ -5,12 +5,13 @@ import { useLazyQuery } from '@apollo/client';
 import { OBTENER_OPCIONES } from '../graphql/querys';
 import { CampoType } from 'types';
 
-export default function CampoSelector({ campo, formData, setFormData, disabled }: {
-  campo: CampoType,
-  formData: any,
-  setFormData: any,
-  disabled: boolean,
-  handleInputChange: (campoNombre: string, value: any) => void;
+export default function CampoSelector({
+  campo,
+  formData,
+  setFormData,
+  disabled,
+  handleInputChange,
+  defaultValue, // <--- nueva prop
 }) {
   const [pickerItems, setPickerItems] = useState([]);
   const [loadOpciones, { loading, error, data }] = useLazyQuery(OBTENER_OPCIONES);
@@ -19,8 +20,8 @@ export default function CampoSelector({ campo, formData, setFormData, disabled }
     if (campo.Fuente && campo.Parametro) {
       loadOpciones({
         variables: {
-          fuente: campo.Fuente, // Asegúrate de que este valor coincide con tu backend
-          parametro: campo.Parametro,  // Asegúrate de que este valor existe en tus datos
+          fuente: campo.Fuente,
+          parametro: campo.Parametro,
         },
       });
     }
@@ -28,14 +29,10 @@ export default function CampoSelector({ campo, formData, setFormData, disabled }
 
   useEffect(() => {
     if (data?.obtenerOpciones?.length) {
-      const items = data.obtenerOpciones.map((opcion: {
-        Label: string,
-        Valor: string,
-      }) => ({
+      const items = data.obtenerOpciones.map((opcion) => ({
         label: opcion.Label,
         value: opcion.Valor,
       }));
-
       setPickerItems(items);
     }
   }, [data]);
@@ -49,33 +46,54 @@ export default function CampoSelector({ campo, formData, setFormData, disabled }
   }
 
   if (error) {
-    return <Text style={styles.errorText}>Error al cargar opciones: {error.message}</Text>;
+    return (
+      <Text style={styles.errorText}>
+        Error al cargar opciones: {error.message}
+      </Text>
+    );
+  }
+
+  if (!pickerItems.length) {
+    return (
+      <Text style={styles.errorText}>
+        Cargando opciones, por favor espere...
+      </Text>
+    );
   }
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{campo.Nombre}</Text>
+
       <RNPickerSelect
         onValueChange={(value) => {
-          const seleccionado = data.obtenerOpciones.find((item: { Label: string; Valor: string }) => item.Valor === value);
-
+          const seleccionado = data?.obtenerOpciones.find(
+            (item) => item.Valor === value
+          );
           if (seleccionado) {
+            // Guarda en formData la info que necesites
             setFormData((prev) => ({
               ...prev,
-              [campo.Nombre]: seleccionado.datosVehiculo, // Guarda el objeto completo del vehículo
+              [campo.CampoId]: seleccionado.datosVehiculo,
             }));
           }
         }}
         items={pickerItems}
-        placeholder={{ label: campo.Descripcion || `${campo.Nombre}`, value: null }}
-        value={campo.Parametro ? formData[campo.Nombre]?.[campo.Parametro] : null} // Valida campo.Parametro
+        placeholder={{
+          label: campo.Descripcion || `${campo.Nombre}`,
+          value: null,
+        }}
+        // Usamos la prop "defaultValue" para marcar el "value" actual
+        // (Si necesitas usar "campo.Parametro", ajusta la lógica)
+        value={defaultValue ?? null}
         style={pickerSelectStyles}
         useNativeAndroidPickerStyle={false}
-        disabled={disabled} // Deshabilita el picker
+        disabled={disabled}
       />
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

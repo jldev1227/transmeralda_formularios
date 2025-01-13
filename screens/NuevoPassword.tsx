@@ -25,8 +25,6 @@ export default function NuevoPassword({ navigation, route }: any) {
   const fields = watch();
   const token = route.params?.token;
 
-  console.log(token)
-
   useEffect(() => {
     if (!token) {
       throw new Error("Token inválido o ausente");

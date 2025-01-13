@@ -19,6 +19,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const { loading, error, data } = useQuery(OBTENER_USUARIO);
 
+  
   useEffect(() => {
     if (data?.obtenerUsuario) {
       dispatch({ type: 'SET_AUTH', payload: data.obtenerUsuario });

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   Modal,
@@ -9,26 +9,33 @@ import {
 } from "react-native";
 import SignatureScreen from "react-native-signature-canvas";
 
-const FirmaInput = ({ text, onOK }) => {
+const FirmaInput = ({ text, onOK, defaultSignature }) => {
   const ref = useRef();
   const [modalVisible, setModalVisible] = useState(false);
-  const [signaturePreview, setSignaturePreview] = useState(null); // Estado para la previsualización de la firma
+  const [signaturePreview, setSignaturePreview] = useState(null);
+
+  // Cada vez que cambie "defaultSignature", actualiza la previsualización:
+  useEffect(() => {
+    if (defaultSignature) {
+      setSignaturePreview(defaultSignature);
+    }
+  }, [defaultSignature]);
 
   // Maneja la captura de la firma (base64)
   const handleOK = (signature) => {
-    setSignaturePreview(signature); // Guarda la firma con el prefijo correcto
+    setSignaturePreview(signature);
     if (onOK) {
-      onOK(signature); // Devuelve la firma al componente padre
+      onOK(signature);
     }
-    setModalVisible(false); // Cierra el modal
+    setModalVisible(false);
   };
 
   // Limpia la firma manualmente desde el botón
   const clearSignature = () => {
     if (ref.current) {
-      ref.current.clearSignature(); // Llama a la función para limpiar el lienzo
+      ref.current.clearSignature();
     }
-    setSignaturePreview(null); // Limpia la previsualización
+    setSignaturePreview(null);
   };
 
   return (
@@ -43,6 +50,7 @@ const FirmaInput = ({ text, onOK }) => {
           />
         </View>
       )}
+
       <TouchableOpacity
         style={styles.openButton}
         onPress={() => setModalVisible(true)}
@@ -60,10 +68,10 @@ const FirmaInput = ({ text, onOK }) => {
           <Text style={styles.title}>{text}</Text>
           <SignatureScreen
             ref={ref}
-            onOK={handleOK} // Callback cuando la firma está lista
-            autoClear={false} // Evita limpiar automáticamente después de guardar
+            onOK={handleOK}
+            autoClear={false}
             descriptionText={text}
-            webStyle={styles.signaturePad} // Estilo para el lienzo
+            webStyle={styles.signaturePad}
             rotated
           />
           <View style={styles.buttonContainer}>
@@ -92,10 +100,10 @@ const FirmaInput = ({ text, onOK }) => {
   );
 };
 
+export default FirmaInput;
+
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
   },
@@ -103,7 +111,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0635ae",
     padding: 15,
     borderRadius: 8,
-    width: '100%'
+    width: "100%",
   },
   openButtonText: {
     color: "#fff",
@@ -122,7 +130,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     marginBottom: 20,
-    transform: [{ rotate: '90deg' }],
+    transform: [{ rotate: "90deg" }],
   },
   modalContainer: {
     flex: 1,
@@ -174,5 +182,3 @@ const styles = StyleSheet.create({
     }
   `,
 });
-
-export default FirmaInput;

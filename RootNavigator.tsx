@@ -14,6 +14,7 @@ import CustomDrawerItem from 'components/CustomerDrawerItem';
 import FormIcon from 'components/FormIcon';
 import { capitalize } from 'utils';
 import FormularioDetalle from 'screens/FormularioDetalle';
+import { FormularioProvider } from 'context/FormularioContext';
 
 // Stack para el flujo de autenticación
 const OutStack = createNativeStackNavigator();
@@ -31,8 +32,8 @@ const MainStack = createNativeStackNavigator();
 // Stack principal
 const FormularioStack = () => (
   <MainStack.Navigator initialRouteName="index">
-    <MainStack.Screen 
-      name="index" 
+    <MainStack.Screen
+      name="index"
       component={FormulariosScreen} // Mostramos el header del stack en 'index'
       options={{
         headerShown: false
@@ -48,25 +49,25 @@ const FormularioStack = () => (
 const NeuralWebDrawer = createDrawerNavigator();
 
 const NeuralWebNavigator = () => {
-
-
   return (
-    <NeuralWebDrawer.Navigator
-      initialRouteName="Formularios"
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-    >
-      <NeuralWebDrawer.Screen 
-        name="Formularios" 
-        component={FormularioStack}
-        options={{
-          headerShown: false
-        }}
-      />
-    </NeuralWebDrawer.Navigator>
+    <FormularioProvider>
+      <NeuralWebDrawer.Navigator
+        initialRouteName="Formularios"
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+      >
+        <NeuralWebDrawer.Screen
+          name="Formularios"
+          component={FormularioStack}
+          options={{
+            headerShown: false
+          }}
+        />
+      </NeuralWebDrawer.Navigator>
+    </FormularioProvider>
   );
 };
 
-  // Componente para contenido personalizado del Drawer
+// Componente para contenido personalizado del Drawer
 const CustomDrawerContent = ({ navigation }) => {
   const { state } = useAuth();
 
@@ -77,8 +78,15 @@ const CustomDrawerContent = ({ navigation }) => {
     if (!state.usuario) {
       return (
         <View style={styles.header}>
-          <Image source={require('assets/Avatar.png')} />
-          <View>
+          <Image
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24, // Para que sea un círculo
+              resizeMode: 'cover',
+            }}
+            source={require('assets/Avatar.png')}
+          />          <View>
             <Text style={styles.text}>Hola</Text>
             <Text style={styles.name}>Invitado</Text>
           </View>
@@ -89,7 +97,15 @@ const CustomDrawerContent = ({ navigation }) => {
     const { nombre, apellido } = state.usuario;
     return (
       <View style={styles.header}>
-        <Image source={require('assets/Avatar.png')} />
+        <Image
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 24, // Para que sea un círculo
+            resizeMode: 'cover',
+          }}
+          source={require('assets/Avatar.png')}
+        />
         <View>
           <Text style={styles.text}>Hola</Text>
           <Text style={styles.name}>
@@ -155,7 +171,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto', // Empuja el botón hacia la parte inferior
     paddingTop: 15,
     borderTopWidth: 1,
-    borderColor: '#D1D3D4', // Línea separadora
+    borderColor: '#efefef', // Línea separadora
   },
   menuItems: {
     flex: 1, // Permite que los elementos del menú ocupen el espacio disponible

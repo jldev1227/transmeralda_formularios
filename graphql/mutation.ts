@@ -39,7 +39,7 @@ export const REGISTRAR_RESPUESTA_FORMULARIO = gql`
       detalles {
         RespuestaDetalleId
         CampoId
-        valor
+        Valor
       }
     }
   }
