@@ -30,7 +30,7 @@ export const CardFormularioRespuesta: React.FC<CardProps> = ({ respuesta }) => {
   // Aquí envías cualquier información que requieras
   const handlePress = () => {
     navigation.navigate('Detalles del formulario', {
-      id: respuesta.formulario.FormularioId,
+      FormularioId: respuesta.formulario.FormularioId,
       nombre: respuesta.formulario.Nombre,
       descripcion: respuesta.formulario.Descripcion,
       // puedes pasar incluso 'detalles' o lo que sea necesario:
@@ -47,7 +47,7 @@ export const CardFormularioRespuesta: React.FC<CardProps> = ({ respuesta }) => {
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
         <Image
-          source={images[respuesta.formulario.Imagen]}
+          source={images[respuesta.formulario.Imagen ?? '']}
           style={styles.image}
         />
         <View style={styles.textContainer}>
