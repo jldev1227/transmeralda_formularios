@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import SignatureScreen from "react-native-signature-canvas";
 
-const FirmaInput = ({ text, onOK, defaultSignature }) => {
+const FirmaInput = ({ text, onOK, defaultSignature, enabled }) => {
   const ref = useRef();
   const [modalVisible, setModalVisible] = useState(false);
   const [signaturePreview, setSignaturePreview] = useState(null);
@@ -51,12 +51,15 @@ const FirmaInput = ({ text, onOK, defaultSignature }) => {
         </View>
       )}
 
-      <TouchableOpacity
-        style={styles.openButton}
-        onPress={() => setModalVisible(true)}
-      >
-        <Text style={styles.openButtonText}>Abrir Firma</Text>
-      </TouchableOpacity>
+
+      {enabled && (
+        <TouchableOpacity
+          style={styles.openButton}
+          onPress={() => setModalVisible(true)}
+        >
+          <Text style={styles.openButtonText}>Abrir Firma</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal
         animationType="slide"

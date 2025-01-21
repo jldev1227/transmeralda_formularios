@@ -10,16 +10,6 @@ export default function FormulariosRespuestasEnviadas({ items }) {
     <View style={{
       flex: 1,
     }}>
-      {/* <View style={styles.inputContainer}>
-              <SearchIcon/>
-              <TextInput
-                style={styles.input}
-                placeholder="Busca un formato"
-                placeholderTextColor="#888888"
-                value={search}
-                onChangeText={handleSearchForm}
-              />
-            </View> */}
       <FlatList
         data={items}
         keyExtractor={(item, index) => index.toString()}
@@ -28,7 +18,6 @@ export default function FormulariosRespuestasEnviadas({ items }) {
           <CardFormularioRespuesta
             key={item.RespuestaFormularioId}
             respuesta={item}
-            onPress={() => navigation.navigate("Detalles del formulario", { id: item.FormularioId })}
           />
         )}
         ListEmptyComponent={<Text style={styles.emptyText}>No hay formularios enviados.</Text>}

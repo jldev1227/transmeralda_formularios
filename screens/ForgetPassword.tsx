@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import LeftArrowCircle from '../components/LeftArrowCircle';
 import { Controller, useForm } from 'react-hook-form';
 import MailIcon from '../components/MailIcon';
@@ -42,7 +42,7 @@ export default function ForgetPassword({ navigation }: any) {
 
   return (
     <AuthLayout>
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <View>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -79,7 +79,7 @@ export default function ForgetPassword({ navigation }: any) {
             {loading ? 'Cargando...' : 'Solicitar instrucciones'}
           </Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     </AuthLayout>
   );
 }
@@ -87,7 +87,8 @@ export default function ForgetPassword({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    gap: 10
+    gap: 10,
+    bac: 'red'
   },
   header: {
     flexDirection: 'row',

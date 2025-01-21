@@ -40,7 +40,17 @@ export const REGISTRAR_RESPUESTA_FORMULARIO = gql`
         RespuestaDetalleId
         CampoId
         Valor
+        campo {
+          CampoId
+          Nombre
+        }
+      }
+      formulario {
+        FormularioId
+        Nombre
+        Descripcion
+        Imagen
       }
     }
   }
-`
+`;

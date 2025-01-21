@@ -6,6 +6,7 @@ export type RootStackParamList = {
   NuevoPassword: undefined;
  "Detalles del formulario": {
     id: string;
+    FormularioId: string;
     nombre?: string;
     descripcion?: string;
     detalles?: Array<{
@@ -41,12 +42,14 @@ export type RespuestaDetalle = {
 };
 
 export type BorradorFormulario = {
+  id: string;
   FormularioId: string;
   UsuarioId: string | number | null;
   detalles: {
     CampoId: string | undefined;
     valor: string | null;
   }[];
+  creacion?: String
 };
 
 

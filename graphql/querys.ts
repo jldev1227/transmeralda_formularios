@@ -93,7 +93,7 @@ export const OBTENER_OPCIONES = gql`
     obtenerOpciones(fuente: $fuente, parametro: $parametro) {
       Valor
       Label
-      datosVehiculo
+      datos
     }
   }
 `;

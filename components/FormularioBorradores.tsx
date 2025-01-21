@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 
 export default function BorradoresScreen() {
   const navigation = useNavigation();
-  const { state, obtenerBorradoresOffline } = useFormulario();
+  const { state, obtenerBorradoresOffline, borrarBorradorOffline } = useFormulario();
   const [borradores, setBorradores] = useState<any[]>([]);
 
   useEffect(() => {
@@ -24,16 +24,33 @@ export default function BorradoresScreen() {
     }
   };
 
-  // Esta función navega a tu pantalla de formulario, pasando los params
-    const handleSeleccionarBorrador = (borrador: any) => {
-      navigation.navigate('Detalles del formulario', {
-        id: borrador.formularioId,
-        nombre: borrador.Nombre,
-        descripcion: borrador.Descripcion,
-        detalles: borrador.detalles, // Indica que ya se respondió (modo enviado)
-      });
-    }
+  // Maneja la selección de un borrador para navegar a su detalle
+  const handleSeleccionarBorrador = (borrador) => {
+    navigation.navigate('Detalles del formulario', {
+      // Asegúrate de usar borrador.id
+      id: borrador.id,
   
+      // (el resto de props que necesites)
+      FormularioId: borrador.FormularioId,
+      nombre: borrador.Nombre,
+      descripcion: borrador.Descripcion,
+      detalles: borrador.detalles,
+      modo: 'borrador',
+      creacion: borrador.creacion,
+      modificacion: borrador.modificacion
+    });
+  };
+  
+
+  const handleEliminarBorrador = async (id: string) => {
+    try {
+      const borradoresActualizados = await borrarBorradorOffline(id); // Ahora usa el `id` en lugar del índice
+      setBorradores(borradoresActualizados); // Actualiza la lista después de eliminar
+    } catch (error) {
+      console.error('Error al borrar borrador offline:', error);
+      // Solo muestra el mensaje de error sin generar una nueva alerta
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -42,26 +59,26 @@ export default function BorradoresScreen() {
       ) : (
         <FlatList
           data={borradores}
-          keyExtractor={(_item, index) => index.toString()}
+          keyExtractor={(item) => item.id} // Usa el `id` único como clave
           contentContainerStyle={styles.listContainer}
           renderItem={({ item }) => {
-            // item = { formularioId, UsuarioId, respuestas, etc. }
-
-            // Puedes buscar meta si lo deseas, p.ej:
             const meta = state.formularios.find(
-              (f: any) => f.FormularioId === item.formularioId
+              (f: any) => f.FormularioId === item.FormularioId
             );
             const nombre = meta?.Nombre || 'Sin nombre';
             const descripcion = meta?.Descripcion || 'Sin descripción';
-            const imagen = meta?.Imagen; // o 'undefined'
+            const imagen = meta?.Imagen;
 
-            // Le pasas la función onPress que llama handleSeleccionarBorrador(item)
             return (
               <CardBorrador
+                id={item.id}
                 nombre={nombre}
                 descripcion={descripcion}
+                creacion={item.creacion}
+                modificacion={item.modificacion}
                 imagen={imagen ?? ''}
                 onPress={() => handleSeleccionarBorrador(item)}
+                onDelete={() => handleEliminarBorrador(item.id)} // Pasa el `id` único
               />
             );
           }}

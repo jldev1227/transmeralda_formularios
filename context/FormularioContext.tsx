@@ -13,7 +13,8 @@ interface FormularioContextProps {
   guardarFormularioOffline: (formulario: Formulario) => Promise<void>;
   guardarRespuestasOffline: (formularioId: Formulario['FormularioId'], respuestas: BorradorFormulario) => Promise<void>;
   sincronizarFormularios: () => Promise<void>;
-  obtenerBorradoresOffline: () => any;
+  obtenerBorradoresOffline: () => Promise<BorradorFormulario[]>;
+  borrarBorradorOffline: () => Promise<BorradorFormulario[]>
 }
 
 const FormularioContext = createContext<FormularioContextProps | undefined>(undefined);
@@ -65,20 +66,24 @@ export const FormularioProvider: React.FC<FormularioProviderProps> = ({ children
     }
   };
 
-  const guardarRespuestasOffline = async (formularioId: Formulario['FormularioId'], respuestas: BorradorFormulario) => {
-    try {
-      const respuestasOffline = await AsyncStorage.getItem('respuestasOffline');
-      const respuestasParsed = respuestasOffline ? JSON.parse(respuestasOffline) : [];
-      const nuevasRespuestas = [
-        ...respuestasParsed,
-        { formularioId, UsuarioId: auth.usuario?.id, respuestas },
-      ];
+  const guardarRespuestasOffline = async (formularioId, borrador) => {
+    const respuestasOffline = await AsyncStorage.getItem('respuestasOffline');
+    const borradores = respuestasOffline ? JSON.parse(respuestasOffline) : [];
 
-      await AsyncStorage.setItem('respuestasOffline', JSON.stringify(nuevasRespuestas));
-    } catch (error) {
-      console.error('Error guardando respuestas offline:', error);
+    // Verifica si el borrador ya existe
+    const index = borradores.findIndex((b) => b.id === borrador.id);
+
+    if (index > -1) {
+      // Actualiza el borrador existente
+      borradores[index] = borrador;
+    } else {
+      // Agrega un nuevo borrador
+      borradores.push(borrador);
     }
+
+    await AsyncStorage.setItem('respuestasOffline', JSON.stringify(borradores));
   };
+
 
   // Sincronizar formularios con el backend
   const sincronizarFormularios = async () => {
@@ -98,6 +103,7 @@ export const FormularioProvider: React.FC<FormularioProviderProps> = ({ children
   const obtenerBorradoresOffline = async (): Promise<BorradorFormulario[]> => {
     try {
       const respuestasOffline = await AsyncStorage.getItem('respuestasOffline');
+
       return respuestasOffline ? JSON.parse(respuestasOffline) : [];
     } catch (error) {
       console.error('Error al obtener borradores offline:', error);
@@ -105,6 +111,32 @@ export const FormularioProvider: React.FC<FormularioProviderProps> = ({ children
     }
   };
 
+  const borrarBorradorOffline = async (id: number): Promise<BorradorFormulario[]> => {
+    try {
+      // Obtener los borradores almacenados como cadena
+      const borradores = await AsyncStorage.getItem('respuestasOffline');
+
+      // Si no hay datos almacenados, retorna un array vacío
+      if (!borradores) {
+        return [];
+      }
+
+      // Parsear los borradores a un array
+      const borradoresArray: BorradorFormulario[] = JSON.parse(borradores);
+
+      // Eliminar el borrador en la posición específica
+      borradoresArray.splice(id, 1);
+
+      // Guardar la lista actualizada en AsyncStorage
+      await AsyncStorage.setItem('respuestasOffline', JSON.stringify(borradoresArray));
+
+      // Retornar los borradores actualizados
+      return borradoresArray;
+    } catch (error) {
+      console.error('Error al borrar borrador offline:', error);
+      return [];
+    }
+  };
 
   // Mostrar `loading` mientras se cargan los formularios o respuestas
   if (loadingFormularios || loadingRespuestas) {
@@ -126,7 +158,8 @@ export const FormularioProvider: React.FC<FormularioProviderProps> = ({ children
       guardarFormularioOffline,
       sincronizarFormularios,
       guardarRespuestasOffline,
-      obtenerBorradoresOffline
+      obtenerBorradoresOffline,
+      borrarBorradorOffline
     }}>
       {children}
     </FormularioContext.Provider>

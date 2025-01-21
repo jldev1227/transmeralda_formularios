@@ -7,14 +7,31 @@ import { CampoType } from 'types';
 
 export default function CampoSelector({
   campo,
-  formData,
-  setFormData,
-  disabled,
+  defaultValue,
   handleInputChange,
-  defaultValue, // <--- nueva prop
+  disabled,
 }) {
+
   const [pickerItems, setPickerItems] = useState([]);
   const [loadOpciones, { loading, error, data }] = useLazyQuery(OBTENER_OPCIONES);
+  const [selected, setSelected] = useState('');
+
+
+  useEffect(() => {
+    if (defaultValue) {
+      setSelected(defaultValue);
+    }
+  }, [defaultValue]);
+
+  useEffect(() => {
+    if (data?.obtenerOpciones?.length) {
+      const items = data.obtenerOpciones.map((opcion) => ({
+        label: opcion.Label,
+        value: opcion.Valor,
+      }));
+      setPickerItems(items);
+    }
+  }, [data]);
 
   useEffect(() => {
     if (campo.Fuente && campo.Parametro) {
@@ -26,16 +43,6 @@ export default function CampoSelector({
       });
     }
   }, [campo.Fuente, campo.Parametro]);
-
-  useEffect(() => {
-    if (data?.obtenerOpciones?.length) {
-      const items = data.obtenerOpciones.map((opcion) => ({
-        label: opcion.Label,
-        value: opcion.Valor,
-      }));
-      setPickerItems(items);
-    }
-  }, [data]);
 
   if (loading) {
     return (
@@ -53,13 +60,7 @@ export default function CampoSelector({
     );
   }
 
-  if (!pickerItems.length) {
-    return (
-      <Text style={styles.errorText}>
-        Cargando opciones, por favor espere...
-      </Text>
-    );
-  }
+  if (!data?.obtenerOpciones?.length) return
 
   return (
     <View style={styles.container}>
@@ -67,25 +68,25 @@ export default function CampoSelector({
 
       <RNPickerSelect
         onValueChange={(value) => {
-          const seleccionado = data?.obtenerOpciones.find(
-            (item) => item.Valor === value
+          setSelected(value);
+
+          const seleccionado = data?.obtenerOpciones?.find(
+            (item) => item.Valor === value // Asegúrate de que el valor coincida exactamente
           );
+
           if (seleccionado) {
-            // Guarda en formData la info que necesites
-            setFormData((prev) => ({
-              ...prev,
-              [campo.CampoId]: seleccionado.datosVehiculo,
-            }));
+            handleInputChange(campo.CampoId, seleccionado);
           }
         }}
+
         items={pickerItems}
         placeholder={{
-          label: campo.Descripcion || `${campo.Nombre}`,
-          value: null,
+          label: campo.Descripcion || campo.Nombre,
+          valor: null,
         }}
         // Usamos la prop "defaultValue" para marcar el "value" actual
         // (Si necesitas usar "campo.Parametro", ajusta la lógica)
-        value={defaultValue ?? null}
+        value={selected}
         style={pickerSelectStyles}
         useNativeAndroidPickerStyle={false}
         disabled={disabled}
@@ -93,7 +94,6 @@ export default function CampoSelector({
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {

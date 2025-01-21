@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
+import 'react-native-get-random-values';
 import {
     View,
     Text,
@@ -19,6 +20,7 @@ import { useAuth } from 'context/AuthContext';
 import { useFormulario } from 'context/FormularioContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { generateUUID } from 'utils/generateUUID';
 
 const Separator = () => <View style={styles.separator} />;
 
@@ -27,6 +29,7 @@ type FormularioDetalleProps = NativeStackScreenProps<RootStackParamList, 'Detall
 export default function FormularioDetalle({ route }: FormularioDetalleProps) {
     const {
         id,
+        FormularioId,
         nombre = '',
         descripcion = '',
         detalles = [],
@@ -46,19 +49,19 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
     const { loading, error, data } = useQuery<{ obtenerFormulario: FormularioType }>(
         OBTENER_FORMULARIO,
         {
-            variables: { id },
+            variables: { id: FormularioId },
         }
     );
 
     // Estados dinámicos para almacenar los valores del formulario
     const { state } = useAuth();
-    const { guardarRespuestasOffline } = useFormulario();
+    const { dispatch, guardarRespuestasOffline, borrarBorradorOffline } = useFormulario();
     const [formData, setFormData] = useState<Record<string, any>>({});
     const [registrarRespuesta] = useMutation(REGISTRAR_RESPUESTA_FORMULARIO);
 
     // Precargar si "modo" es enviado y tenemos detalles
     useEffect(() => {
-        if (modo === 'enviado' && detalles?.length) {
+        if (modo === 'enviado' || modo === 'borrador' && detalles?.length) {
             precargarDesdeDetalles(detalles);
         }
     }, [modo, detalles]);
@@ -67,25 +70,21 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
      * Lógica para precargar datos en formData desde 'detalles'.
      * Cada detalle es { CampoId, valor } y guardaremos valor con la key CampoId.
     */
-    const precargarDesdeDetalles = (detalles: any[]) => {
-        const initialFormData: Record<string, any> = {};
+    const precargarDesdeDetalles = (detalles) => {
+        if (!detalles || !Array.isArray(detalles)) {
+            console.error('Detalles inválidos:', detalles);
+            return;
+        }
 
+        const initialFormData = {};
         detalles.forEach((detalle) => {
-            let valor = detalle.Valor;
-
-            if (valor === 'true') {
-                valor = true;
-            } else if (valor === 'false') {
-                valor = false;
-            }
-
+            let valor = detalle.valor || detalle.Valor; // Asegura la compatibilidad con ambas claves
+            if (valor === 'true') valor = true;
+            else if (valor === 'false') valor = false;
             initialFormData[detalle.CampoId] = valor;
         });
-
         setFormData(initialFormData);
     };
-
-
     // -- Helpers de Referencias, Validaciones y Transformación --
 
     /**
@@ -107,20 +106,18 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                         if (campo.CampoId === campoId && campo.Tipo === "opcion") {
                             if (campo.HabilitaTexto === false) {
                                 // Si no habilita texto, guardar solo el valor
-                                nuevoFormData[campoId] = value.valor;
+                                nuevoFormData[campoId] = value?.valor ?? null;
                             } else {
                                 // Mantener estructura con texto
-                                nuevoFormData[campoId] = value;
+                                nuevoFormData[campoId] = value ?? null;
                             }
                         } else {
                             nuevoFormData[campoId] = value;
                         }
 
-                        // Procesar referencias si existen
-                        if (campo.ReferenciaCampo && campo.ReferenciaPropiedad) {
-                            const valorReferenciado = value?.[campo.ReferenciaPropiedad];
-                            nuevoFormData[campo.CampoId] =
-                                valorReferenciado ?? campo.ValorDefecto;
+                        if (campo.ReferenciaCampo && campo.ReferenciaPropiedad && value.datos) {
+                            const valorReferenciado = value?.datos[campo.ReferenciaPropiedad];
+                            nuevoFormData[campo.CampoId] = valorReferenciado ?? campo.ValorDefecto ?? null;
                         }
                     });
                 });
@@ -131,7 +128,6 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
             return nuevoFormData;
         });
     };
-
 
     const sincronizarReferencias = (
         formData: Record<string, any>,
@@ -166,13 +162,6 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
             categoria.campos.forEach((campo) => {
                 let valorCampo = nuevoFormData[campo.CampoId];
 
-                // Si el campo es de tipo selector y tiene un parámetro
-                if (campo.Tipo === 'selector' && campo.Parametro && valorCampo) {
-                    const parametroValor = valorCampo[campo.Parametro];
-                    nuevoFormData[campo.CampoId] = parametroValor;
-                    valorCampo = parametroValor;
-                }
-
                 // Validar que el campo esté diligenciado
                 if (
                     campo.Requerido &&
@@ -192,27 +181,34 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
 
     // -- Handlers de Botones --
 
-    const transformarDatos = (formData: Record<string, any>, categorias: any[]) => {
+    const transformarDatos = (formData, categorias) => {
         return Object.entries(formData).map(([campoId, valor]) => {
             const campo = categorias
-                .flatMap((c: any) => c.campos)
-                .find((c: any) => c.CampoId === campoId);
+                .flatMap((c) => c.campos)
+                .find((c) => c.CampoId === campoId);
 
-            // Si no habilita texto, usar el valor directamente
-            const valorTransformado = typeof valor === "object" && valor !== null
-                ? valor.texto?.trim() // Si `texto` existe y no está vacío
-                    ? valor.texto // Usa `texto`
-                    : valor.valor // Si `texto` está vacío, usa `valor`
-                : valor; // Si no es un objeto, usa el valor directamente.
+            // Verifica si 'valor' es un objeto que contiene { value, ...otrosDatos }
+            let valorTransformado;
+            if (typeof valor === 'object' && valor !== null) {
+                // 1) Si quieres SOLO el texto que seleccionó el usuario:
+                valorTransformado = valor.value || valor.Valor;
+                // 2) Si quisieras GUARDAR TODO como JSON:
+                // valorTransformado = JSON.stringify(valor);
+            } else {
+                // No es objeto; se usa directamente
+                valorTransformado = valor;
+            }
 
             return {
                 CampoId: campo?.CampoId,
-                valor: valorTransformado !== null && valorTransformado !== undefined
-                    ? valorTransformado.toString()
-                    : "", // Si es null o undefined, enviar como cadena vacía.
+                valor:
+                    valorTransformado !== null && valorTransformado !== undefined
+                        ? valorTransformado.toString()
+                        : '',
             };
         });
     };
+
 
     // En handleSubmit o cualquier lugar donde uses transformarDatos
     const handleSubmit = async () => {
@@ -252,13 +248,23 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
         }
 
         try {
-            await registrarRespuesta({ variables: { input } });
+            // Ejecutar la mutación y obtener el resultado
+            const response = await registrarRespuesta({ variables: { input } });
+
+            // Acceder al valor retornado en `response.data`
+            const data = response?.data?.registrarRespuesta; // Ajusta el nombre del resolver según tu backend
+            dispatch({
+                type: 'ADD_RESPUESTA',
+                payload: data,
+            })
+
             Alert.alert('Éxito', 'Las respuestas han sido registradas exitosamente.', [
                 {
                     text: 'Aceptar',
                     onPress: () => {
                         setFormData({}); // Vaciar el formulario
                         navigation.replace('index'); // Reemplazar la navegación
+                        borrarBorradorOffline(id)
                     },
                 },
             ]);
@@ -272,7 +278,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
         }
     };
 
-    const handleGuardarBorrador = () => {
+    const handleGuardarBorrador = async () => {
         if (!isEditable) return; // modo enviado -> no hace nada
 
         const formulario = data?.obtenerFormulario;
@@ -297,24 +303,56 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
             formulario.categorias
         );
 
-        // 3. Crear borrador
+        // Verificamos si estamos creando un nuevo borrador o actualizando uno existente
+        const esBorradorExistente = modo === 'borrador' && route.params?.id;
+
+        // 3. Si es borrador existente, cargamos o recuperamos el borrador guardado
+
+
+        // 4. Construir el objeto borrador con la información que queramos guardar
         const borrador: BorradorFormulario = {
+            id: esBorradorExistente ? id : generateUUID(),
             FormularioId: formulario.FormularioId,
             UsuarioId: state.usuario?.id,
             detalles: detallesTransformados,
+
+            // **Mantén la fecha de creación previa si existe; 
+            //   de lo contrario, usa la fecha actual.**
+            creacion: !esBorradorExistente ? new Date().toISOString() : route.params.creacion,
+
+            // Si estamos actualizando un borrador existente, 
+            // agregamos la fecha de modificación
+            ...(esBorradorExistente && {
+                modificacion: new Date().toISOString(),
+            }),
         };
 
-        // 4. Guardar offline
-        guardarRespuestasOffline(formulario.FormularioId, borrador);
+        try {
+            // 5. Guardar o actualizar el borrador
+            await guardarRespuestasOffline(formulario.FormularioId, borrador);
 
-        Alert.alert(
-            'Borrador Guardado',
-            'El formulario se ha guardado como borrador correctamente.',
-            [{ text: 'Aceptar' }]
-        );
+            Alert.alert(
+                'Borrador Guardado',
+                esBorradorExistente
+                    ? 'El borrador se ha actualizado correctamente.'
+                    : 'El formulario se ha guardado como borrador correctamente.',
+                [
+                    {
+                        text: 'Aceptar',
+                        onPress: () => {
+                            setFormData({});
+                            navigation.replace('index');
+                        },
+                    },
+                ]
+            );
+        } catch (error) {
+            console.error('Error al guardar o actualizar el borrador:', error);
+            Alert.alert('Error', 'Hubo un problema al guardar el borrador.', [
+                { text: 'Aceptar' },
+            ]);
+        }
     };
-
-    // -- Render principal --
 
     if (loading) {
         return (
@@ -382,13 +420,10 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                 <View key={campo.CampoId} style={styles.fieldContainer}>
                                     <CampoSelector
                                         campo={campo}
-                                        formData={formData}
-                                        setFormData={setFormData}
                                         disabled={!!campo.ReferenciaCampo || !isEditable}
                                         handleInputChange={handleInputChange}
-
                                         // Aquí inyectas el valor que quieres usar como "default"
-                                        defaultValue={formData[campo.CampoId]}
+                                        defaultValue={typeof formData[campo.CampoId] === "string" ? formData[campo.CampoId] : formData[campo.CampoId]?.Valor}
                                     />
                                 </View>
                             );
@@ -456,9 +491,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                         if (campo.Tipo === 'texto') {
                             return (
                                 <View key={campo.CampoId} style={styles.fieldContainer}>
-                                    <Text
-                                        style={styles.fieldLabel}
-                                    >
+                                    <Text style={styles.fieldLabel}>
                                         {campo.Nombre}
                                     </Text>
                                     <TextInput
@@ -470,19 +503,20 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                         value={
                                             isEditable
                                                 ? // Si es editable, usamos la primera versión de "value"
-                                                campo.ReferenciaCampo && campo.ReferenciaPropiedad
-                                                    ? formData[campo.ReferenciaCampo]?.[campo.ReferenciaPropiedad] ?? ''
-                                                    : (
-                                                        typeof formData[campo.CampoId] === 'object'
-                                                            ? formData[campo.CampoId]?.texto
-                                                            : formData[campo.CampoId]
-                                                    ) ?? ''
+                                                modo !== 'enviado' ? formData[campo.CampoId] :
+                                                    campo.ReferenciaCampo && campo.ReferenciaPropiedad
+                                                        ? formData[campo.ReferenciaCampo]?.[campo.ReferenciaPropiedad] ?? ''
+                                                        : (
+                                                            typeof formData[campo.CampoId] === 'object'
+                                                                ? formData[campo.CampoId]
+                                                                : formData[campo.CampoId]
+                                                        ) ?? ''
                                                 : // Si NO es editable, usamos la segunda versión de "value"
                                                 campo.ReferenciaCampo && campo.ReferenciaPropiedad
                                                     ? formData[campo.CampoId] ?? ''
                                                     : (
                                                         typeof formData[campo.CampoId] === 'object'
-                                                            ? formData[campo.CampoId]?.texto
+                                                            ? formData[campo.CampoId]
                                                             : formData[campo.CampoId]
                                                     ) ?? ''
                                         }
@@ -494,6 +528,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                 </View>
                             );
                         }
+
 
                         if (campo.Tipo === 'number') {
                             return (
@@ -537,34 +572,34 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
 
                         if (campo.Tipo === 'opcion') {
                             const valorSeleccionado = formData[campo.CampoId]?.valor || formData[campo.CampoId];
-                        
+
                             // Buscar coincidencia exacta con el valor seleccionado
                             let opcionElegida = campo.opciones?.find((o) => o.Valor === valorSeleccionado);
-                        
+
                             // Si no hay coincidencia exacta y el modo es 'enviado', buscar una opción con HabilitaTexto: true
                             if (!opcionElegida && valorSeleccionado && modo === 'enviado') {
                                 opcionElegida = campo.opciones?.find((o) => o.HabilitaTexto);
                             }
-                        
+
                             // Determinar si se debe mostrar el TextInput
                             const mostrarTextInput =
                                 modo === 'enviado'
                                     ? opcionElegida?.HabilitaTexto && (!opcionElegida || opcionElegida.Valor !== valorSeleccionado)
                                     : opcionElegida?.HabilitaTexto;
-                        
+
                             return (
                                 <View key={campo.CampoId} style={styles.fieldContainer}>
                                     <Text style={styles.fieldLabel}>{campo.Nombre}</Text>
-                        
+
                                     {/* Render de las opciones */}
                                     {campo.opciones?.map((opcion, opcionIndex) => {
                                         // Verificar si esta opción está seleccionada
                                         const opcionSeleccionada =
                                             modo === 'enviado'
                                                 ? opcion.Valor === valorSeleccionado ||
-                                                  (opcion.HabilitaTexto && valorSeleccionado !== opcionElegida?.Valor)
+                                                (opcion.HabilitaTexto && valorSeleccionado !== opcionElegida?.Valor)
                                                 : opcion.Valor === valorSeleccionado;
-                        
+
                                         return (
                                             <TouchableOpacity
                                                 key={opcionIndex}
@@ -592,7 +627,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                             </TouchableOpacity>
                                         );
                                     })}
-                        
+
                                     {/* Mostrar el TextInput si se cumple la condición */}
                                     {mostrarTextInput && (
                                         <TextInput
@@ -619,7 +654,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                 </View>
                             );
                         }
-                                           
+
 
                         if (campo.Tipo === 'check') {
                             // 1. Detectar si es boolean true o string "true"
@@ -666,7 +701,6 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                             );
                         }
 
-
                         if (campo.Tipo === 'firma') {
                             return (
                                 <View key={campo.CampoId} style={styles.fieldContainer}>
@@ -682,6 +716,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                             text={campo.Placeholder || "Por favor, firme aquí"}
                                             defaultSignature={formData[campo.CampoId]} // <-- firma guardada en formData
                                             onOK={() => { }}
+                                            enabled={isEditable}
                                         />
                                     ) : (
                                         // Modo editable (nuevo/borrador)
@@ -689,6 +724,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                             text={campo.Placeholder || "Por favor, firme aquí"}
                                             defaultSignature={formData[campo.CampoId]} // o null si no existe
                                             onOK={(signature) => handleInputChange(campo.CampoId, signature)}
+                                            enabled={isEditable}
                                         />
                                     )}
 
@@ -708,7 +744,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
             {isEditable && (
                 <>
                     <TouchableOpacity onPress={handleGuardarBorrador} style={styles.buttonSave}>
-                        <Text style={styles.buttonSaveText}>Guardar como borrador</Text>
+                        <Text style={styles.buttonSaveText}>{modo === 'borrador' ? 'Actualizar borrador' : 'Guardar como borrador'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleSubmit} style={styles.buttonSubmit}>
                         <Text style={styles.buttonSubmitText}>Enviar respuestas</Text>
