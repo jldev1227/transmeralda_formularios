@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import { useLazyQuery } from '@apollo/client';
 import { OBTENER_OPCIONES } from '../graphql/querys';
@@ -46,8 +46,17 @@ export default function CampoSelector({
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color="#0000ff" />
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 10
+      }}>
+        <ActivityIndicator size="large" color="#2E8B57" />;
+        <Text style={{
+          fontSize: 16,
+          color: '#2E8B57',
+        }}>Cargando opciones...</Text>
       </View>
     );
   }
@@ -81,7 +90,7 @@ export default function CampoSelector({
 
         items={pickerItems}
         placeholder={{
-          label: campo.Descripcion || campo.Nombre,
+          label: campo.Placeholder,
           valor: null,
         }}
         // Usamos la prop "defaultValue" para marcar el "value" actual

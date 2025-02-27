@@ -1,4 +1,3 @@
-import { NavigationProp, useNavigation } from "@react-navigation/native";
 import FormularioBorradores from "components/FormularioBorradores";
 import FormulariosFormatos from "components/FormulariosFormatos";
 import FormulariosRespuestasEnviadas from "components/FormulariosRespuestasEnviadas";
@@ -10,7 +9,6 @@ import { TabView, SceneMap, TabBar } from "react-native-tab-view";
 
 const FormulariosScreen = () => {
   const { state } = useFormulario()
-  const navigation = useNavigation()
 
   const [index, setIndex] = useState(0);
   const [routes] = useState([

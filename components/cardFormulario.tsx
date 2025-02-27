@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Image, View } from 'react-native';
 import { Text, StyleSheet, TouchableWithoutFeedback, Animated } from 'react-native';
-import { Formulario } from 'types';
 import { images } from 'utils/images';
 import IconClipboardOutline from './IconClipboardOutline';
+import { FormularioType } from 'types';
 
 type CardProps = {
-  formulario: Formulario;
+  formulario: FormularioType;
   onPress: () => void;
 };
 
@@ -34,10 +34,12 @@ export const CardFormulario: React.FC<CardProps> = ({ formulario, onPress }) => 
       onPress={onPress}
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-        <Image
-          source={images[formulario.Imagen]}
-          style={styles.image}
-        />
+        {formulario.Imagen && (
+          <Image
+            source={images[formulario.Imagen]}
+            style={styles.image}
+          />
+        )}
         <View style={styles.textContainer}>
           <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
             {formulario.Nombre}
@@ -46,7 +48,7 @@ export const CardFormulario: React.FC<CardProps> = ({ formulario, onPress }) => 
             {formulario.Descripcion}
           </Text>
         </View>
-        <IconClipboardOutline/>
+        <IconClipboardOutline />
       </Animated.View>
     </TouchableWithoutFeedback>
   );

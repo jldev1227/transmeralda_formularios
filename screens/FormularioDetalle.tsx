@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
 import 'react-native-get-random-values';
 import {
     View,
@@ -11,11 +10,9 @@ import {
     TouchableOpacity,
     Alert,
 } from 'react-native';
-import { OBTENER_FORMULARIO } from '../graphql/querys';
 import CampoSelector from 'components/Picker';
 import FirmaInput from 'components/firmaInput';
-import { BorradorFormulario, FormularioType, RootStackParamList } from 'types';
-import { REGISTRAR_RESPUESTA_FORMULARIO } from 'graphql/mutation';
+import { BorradorFormulario, CategoriaType, FormularioType, RootStackParamList } from 'types';
 import { useAuth } from 'context/AuthContext';
 import { useFormulario } from 'context/FormularioContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
@@ -23,41 +20,61 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { generateUUID } from 'utils/generateUUID';
 
 const Separator = () => <View style={styles.separator} />;
+interface ValorObj {
+    texto?: string;
+    value?: string;
+    Valor?: string;
+    valor?: string;
+}
+
+type Modo = "nuevo" | "borrador" | "enviado";
+
 
 type FormularioDetalleProps = NativeStackScreenProps<RootStackParamList, 'Detalles del formulario'>;
 
 export default function FormularioDetalle({ route }: FormularioDetalleProps) {
+
     const {
-        id,
-        FormularioId,
+        RespuestaFormularioId,
+        FormularioId = '',
         nombre = '',
         descripcion = '',
-        detalles = [],
+        detalles = []
     } = route.params;
 
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
     // -- Determinación de modo --
-    const modoParam = route.params.modo;
-    const modo = modoParam
+    // Declara la variable como Modo | undefined
+    const modoParam: Modo | undefined = route.params.modo;
+
+    // Y luego determinas el modo final:
+    const modo: Modo = modoParam
         ? modoParam
         : (detalles && detalles.length > 0 ? 'enviado' : 'nuevo');
 
     const isEditable = (modo === 'nuevo' || modo === 'borrador');
 
-    // GraphQL para obtener el formulario por ID
-    const { loading, error, data } = useQuery<{ obtenerFormulario: FormularioType }>(
-        OBTENER_FORMULARIO,
-        {
-            variables: { id: FormularioId },
-        }
-    );
-
     // Estados dinámicos para almacenar los valores del formulario
     const { state } = useAuth();
-    const { dispatch, guardarRespuestasOffline, borrarBorradorOffline } = useFormulario();
+    const { state: { formularios } } = useFormulario();
+    const { guardarRespuestasOffline, registrarRespuestaFetch } = useFormulario();
     const [formData, setFormData] = useState<Record<string, any>>({});
-    const [registrarRespuesta] = useMutation(REGISTRAR_RESPUESTA_FORMULARIO);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formulario, setFormulario] = useState<FormularioType | null>(null);
+    const [categorias, setCategorias] = useState<CategoriaType[]>([]);
+
+    useEffect(() => {
+        const formularioEncontrado = formularios.find(
+            (formulario: FormularioType) => formulario.FormularioId === route.params.FormularioId
+        );
+
+        if (formularioEncontrado) {
+            setFormulario(formularioEncontrado);
+            setCategorias(formularioEncontrado.categorias || []); // Evita problemas si `categorias` es `undefined`
+        }
+    }, [formularios, route.params.FormularioId]); // Agregar dependencias para evitar advertencias de React
+
 
     // Precargar si "modo" es enviado y tenemos detalles
     useEffect(() => {
@@ -99,9 +116,8 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
         setFormData((prev) => {
             const nuevoFormData = { ...prev };
 
-            const formulario = data?.obtenerFormulario;
             if (formulario) {
-                formulario.categorias.forEach((categoria) => {
+                categorias.forEach((categoria) => {
                     (categoria.campos || []).forEach((campo) => {
                         if (campo.CampoId === campoId && campo.Tipo === "opcion") {
                             if (campo.HabilitaTexto === false) {
@@ -183,28 +199,40 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
 
     const transformarDatos = (formData, categorias) => {
         return Object.entries(formData).map(([campoId, valor]) => {
+            // Encuentra el campo en 'categorias'
             const campo = categorias
                 .flatMap((c) => c.campos)
                 .find((c) => c.CampoId === campoId);
 
-            // Verifica si 'valor' es un objeto que contiene { value, ...otrosDatos }
             let valorTransformado;
+
+            // 1) Verificar si 'valor' es un objeto
             if (typeof valor === 'object' && valor !== null) {
-                // 1) Si quieres SOLO el texto que seleccionó el usuario:
-                valorTransformado = valor.value || valor.Valor;
-                // 2) Si quisieras GUARDAR TODO como JSON:
-                // valorTransformado = JSON.stringify(valor);
+                // "Forzamos" a TS a tratar 'valor' como 'ValorObj'
+                const obj = valor as ValorObj;
+
+                if (obj.texto?.trim()) {
+                    valorTransformado = obj.texto;
+                } else if (obj.value !== undefined) {
+                    valorTransformado = obj.value;
+                } else if (obj.Valor !== undefined) {
+                    valorTransformado = obj.Valor;
+                } else if (obj.valor !== undefined) {
+                    valorTransformado = obj.valor;
+                } else {
+                    valorTransformado = JSON.stringify(obj);
+                }
             } else {
-                // No es objeto; se usa directamente
                 valorTransformado = valor;
             }
 
+            // 3) Convertir a string, excepto null/undefined => ""
             return {
                 CampoId: campo?.CampoId,
                 valor:
                     valorTransformado !== null && valorTransformado !== undefined
                         ? valorTransformado.toString()
-                        : '',
+                        : "",
             };
         });
     };
@@ -212,25 +240,31 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
 
     // En handleSubmit o cualquier lugar donde uses transformarDatos
     const handleSubmit = async () => {
-        if (!isEditable) return; // Modo enviado -> no hace nada
+        // (2) Evitar reenvíos
+        if (isSubmitting) return;
+        setIsSubmitting(true);     // Bloqueamos nuevos envíos
 
-        const formulario = data?.obtenerFormulario;
-        if (!formulario) return;
+        if (!formulario) {
+            setIsSubmitting(false);
+            return;
+        }
 
-        const processedFormData = sincronizarReferencias(formData, formulario.categorias);
+        if (!isEditable) return;
 
-        const { errores, nuevoFormData } = validarCampos(processedFormData, formulario.categorias);
+        const processedFormData = sincronizarReferencias(formData, categorias);
+        const { errores, nuevoFormData } = validarCampos(processedFormData, categorias);
 
         if (errores.length > 0) {
+            setIsSubmitting(false);
             Alert.alert('Errores de Validación', errores.join('\n\n'), [{ text: 'Aceptar' }]);
             return;
         }
 
-        // Transformar datos usando la lógica actualizada
-        const detallesTransformados = transformarDatos(nuevoFormData, formulario.categorias);
+        const detallesTransformados = transformarDatos(nuevoFormData, categorias);
 
         if (!detallesTransformados.length) {
             console.error('No se encontraron detalles para enviar.');
+            setIsSubmitting(false);
             Alert.alert('Error', 'No se encontraron detalles válidos para enviar.', [
                 { text: 'Aceptar' },
             ]);
@@ -238,33 +272,28 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
         }
 
         const input = {
-            FormularioId: formulario?.FormularioId || null,
-            UsuarioId: state.usuario?.id || null,
+            FormularioId: formulario?.FormularioId ?? null, // Asegura que no sea undefined
+            UsuarioId: state.usuario?.id.toString() ?? null, // Asegura que no sea undefined
             detalles: detallesTransformados,
-        };
+          };
+          
 
         if (!input.FormularioId || !input.UsuarioId) {
+            setIsSubmitting(false);
             throw new Error('FormularioId o UsuarioId no están definidos.');
         }
 
         try {
-            // Ejecutar la mutación y obtener el resultado
-            const response = await registrarRespuesta({ variables: { input } });
 
-            // Acceder al valor retornado en `response.data`
-            const data = response?.data?.registrarRespuesta; // Ajusta el nombre del resolver según tu backend
-            dispatch({
-                type: 'ADD_RESPUESTA',
-                payload: data,
-            })
+            await registrarRespuestaFetch(input)
 
             Alert.alert('Éxito', 'Las respuestas han sido registradas exitosamente.', [
                 {
                     text: 'Aceptar',
                     onPress: () => {
-                        setFormData({}); // Vaciar el formulario
-                        navigation.replace('index'); // Reemplazar la navegación
-                        borrarBorradorOffline(id)
+                        setFormData({});
+                        // Regresar a la pantalla principal (o la que decidas)
+                        navigation.reset({ index: 0, routes: [{ name: 'index' }] });
                     },
                 },
             ]);
@@ -275,13 +304,16 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                 'Hubo un problema al registrar las respuestas. Inténtalo de nuevo.',
                 [{ text: 'Aceptar' }]
             );
+        } finally {
+            // (3) Liberamos el bloqueo de envío
+            setIsSubmitting(false);
         }
     };
 
     const handleGuardarBorrador = async () => {
         if (!isEditable) return; // modo enviado -> no hace nada
 
-        const formulario = data?.obtenerFormulario;
+        const formulario = route.params;
         if (!formulario || !formulario.FormularioId || !state.usuario?.id) {
             Alert.alert(
                 'Error',
@@ -294,40 +326,40 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
         // 1. Sincronizar referencias
         const processedFormData = sincronizarReferencias(
             formData,
-            formulario.categorias
+            categorias
         );
 
         // 2. Transformar
         const detallesTransformados = transformarDatos(
             processedFormData,
-            formulario.categorias
+            categorias
         );
 
         // Verificamos si estamos creando un nuevo borrador o actualizando uno existente
-        const esBorradorExistente = modo === 'borrador' && route.params?.id;
+        const esBorradorExistente = modo === 'borrador' && route.params?.RespuestaFormularioId;
 
         // 3. Si es borrador existente, cargamos o recuperamos el borrador guardado
 
 
         // 4. Construir el objeto borrador con la información que queramos guardar
         const borrador: BorradorFormulario = {
-            id: esBorradorExistente ? id : generateUUID(),
+            RespuestaFormularioId: esBorradorExistente ? RespuestaFormularioId : generateUUID(),
             FormularioId: formulario.FormularioId,
             UsuarioId: state.usuario?.id,
             detalles: detallesTransformados,
+            estado: "borrador",
 
             // **Mantén la fecha de creación previa si existe; 
             //   de lo contrario, usa la fecha actual.**
-            creacion: !esBorradorExistente ? new Date().toISOString() : route.params.creacion,
+            creacion: !esBorradorExistente ? new Date().toISOString() : (route.params as any).creacion,
 
             // Si estamos actualizando un borrador existente, 
             // agregamos la fecha de modificación
-            ...(esBorradorExistente && {
-                modificacion: new Date().toISOString(),
-            }),
+            modificacion: esBorradorExistente ? new Date().toISOString() : ''
         };
 
         try {
+
             // 5. Guardar o actualizar el borrador
             await guardarRespuestasOffline(formulario.FormularioId, borrador);
 
@@ -341,7 +373,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                         text: 'Aceptar',
                         onPress: () => {
                             setFormData({});
-                            navigation.replace('index');
+                            navigation.reset({ index: 0, routes: [{ name: 'index' }] }); // Navega de vuelta al flujo de autenticación
                         },
                     },
                 ]
@@ -354,54 +386,28 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
         }
     };
 
-    if (loading) {
+    if (isSubmitting) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#2E8B57" />
+            <View style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 10
+            }}>
+                <ActivityIndicator size="large" color="#2E8B57" />;
+                <Text style={{
+                    fontSize: 16,
+                    color: '#2E8B57',
+                }}>Enviando respuestas...</Text>
             </View>
-        );
+        )
     }
-
-    if (error) {
-        return (
-            <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>
-                    Error al cargar el formulario: {error.message}
-                </Text>
-            </View>
-        );
-    }
-
-    const formulario = data?.obtenerFormulario;
-    if (!formulario || !Array.isArray(formulario.categorias)) {
-        return (
-            <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>
-                    No se encontró el formulario o sus categorías.
-                </Text>
-            </View>
-        );
-    }
-
-    // Arreglar posibles nulos en los campos
-    formulario.categorias.forEach((categoria) => {
-        if (!Array.isArray(categoria.campos)) {
-            console.warn(
-                `La categoría con ID ${categoria.CategoriaId} tiene campos nulos o inválidos.`
-            );
-            categoria.campos = [];
-        }
-    });
-
-    const categorias = formulario.categorias;
 
     return (
         <ScrollView contentContainerStyle={styles.container}>
-            {/* Mostramos el nombre y descripción proveniente de la navegación, o del formulario */}
-            <Text style={styles.title}>{nombre || formulario.Nombre}</Text>
-            <Text>{descripcion || formulario.Descripcion}</Text>
+            <Text style={styles.title}>{nombre}</Text>
+            <Text>{route.params.descripcion}</Text>
 
-            {/* Renderizado de categorías y campos */}
             {categorias.map((categoria, indexCategoria) => (
                 <View key={categoria.CategoriaId} style={styles.categoryContainer}>
                     <Text style={styles.categoryTitle}>{categoria.Nombre}</Text>
@@ -411,7 +417,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                         </Text>
                     )}
 
-                    {(categoria.campos || []).map((campo) => {
+                    {categoria.campos.map((campo) => {
                         // ----------------------------------------
                         // Render de cada tipo de campo
                         // ----------------------------------------
@@ -503,7 +509,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                         value={
                                             isEditable
                                                 ? // Si es editable, usamos la primera versión de "value"
-                                                modo !== 'enviado' ? formData[campo.CampoId] :
+                                                modo as Modo !== "enviado" ? formData[campo.CampoId] :
                                                     campo.ReferenciaCampo && campo.ReferenciaPropiedad
                                                         ? formData[campo.ReferenciaCampo]?.[campo.ReferenciaPropiedad] ?? ''
                                                         : (
@@ -548,7 +554,7 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                         placeholder={
                                             campo.Placeholder || 'Ingrese un valor numérico'
                                         }
-                                        keyboardType="numeric"
+                                        inputMode="numeric"
                                         value={
                                             campo.ReferenciaCampo &&
                                                 campo.ReferenciaPropiedad
@@ -577,13 +583,13 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                             let opcionElegida = campo.opciones?.find((o) => o.Valor === valorSeleccionado);
 
                             // Si no hay coincidencia exacta y el modo es 'enviado', buscar una opción con HabilitaTexto: true
-                            if (!opcionElegida && valorSeleccionado && modo === 'enviado') {
+                            if (!opcionElegida && valorSeleccionado && modo !== 'nuevo') {
                                 opcionElegida = campo.opciones?.find((o) => o.HabilitaTexto);
                             }
 
                             // Determinar si se debe mostrar el TextInput
                             const mostrarTextInput =
-                                modo === 'enviado'
+                                modo !== 'nuevo'
                                     ? opcionElegida?.HabilitaTexto && (!opcionElegida || opcionElegida.Valor !== valorSeleccionado)
                                     : opcionElegida?.HabilitaTexto;
 
@@ -591,11 +597,10 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                 <View key={campo.CampoId} style={styles.fieldContainer}>
                                     <Text style={styles.fieldLabel}>{campo.Nombre}</Text>
 
-                                    {/* Render de las opciones */}
                                     {campo.opciones?.map((opcion, opcionIndex) => {
                                         // Verificar si esta opción está seleccionada
                                         const opcionSeleccionada =
-                                            modo === 'enviado'
+                                            modo !== 'nuevo'
                                                 ? opcion.Valor === valorSeleccionado ||
                                                 (opcion.HabilitaTexto && valorSeleccionado !== opcionElegida?.Valor)
                                                 : opcion.Valor === valorSeleccionado;
@@ -628,7 +633,6 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                                         );
                                     })}
 
-                                    {/* Mostrar el TextInput si se cumple la condición */}
                                     {mostrarTextInput && (
                                         <TextInput
                                             style={[
@@ -733,23 +737,22 @@ export default function FormularioDetalle({ route }: FormularioDetalleProps) {
                         }
 
                         // Si no coincide con ningún tipo conocido, no renderiza nada
-                        return null;
+                        return <Text>No hay campos para mostrar</Text>;
                     })}
 
                     {indexCategoria + 1 !== categorias.length && <Separator />}
                 </View>
             ))}
 
-            {/* Mostrar botones sólo si es editable */}
             {isEditable && (
-                <>
+                <View>
                     <TouchableOpacity onPress={handleGuardarBorrador} style={styles.buttonSave}>
                         <Text style={styles.buttonSaveText}>{modo === 'borrador' ? 'Actualizar borrador' : 'Guardar como borrador'}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={handleSubmit} style={styles.buttonSubmit}>
+                    <TouchableOpacity disabled={isSubmitting} onPress={handleSubmit} style={styles.buttonSubmit}>
                         <Text style={styles.buttonSubmitText}>Enviar respuestas</Text>
                     </TouchableOpacity>
-                </>
+                </View>
             )}
         </ScrollView>
     );

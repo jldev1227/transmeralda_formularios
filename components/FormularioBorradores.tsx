@@ -3,9 +3,14 @@ import { View, Text, FlatList, StyleSheet, Alert } from 'react-native';
 import { useFormulario } from 'context/FormularioContext';
 import CardBorrador from './CardBorrador';
 import { useNavigation } from '@react-navigation/native';
+import { BorradorFormulario, RootStackParamList } from 'types';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+
+type DetallesNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Detalles del formulario'>;
 
 export default function BorradoresScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<DetallesNavigationProp>();
   const { state, obtenerBorradoresOffline, borrarBorradorOffline } = useFormulario();
   const [borradores, setBorradores] = useState<any[]>([]);
 
@@ -24,27 +29,27 @@ export default function BorradoresScreen() {
     }
   };
 
-  // Maneja la selección de un borrador para navegar a su detalle
-  const handleSeleccionarBorrador = (borrador) => {
-    navigation.navigate('Detalles del formulario', {
-      // Asegúrate de usar borrador.id
-      id: borrador.id,
-  
-      // (el resto de props que necesites)
+  const handleSeleccionarBorrador = (borrador: BorradorFormulario) => {
+    console.log(borrador)
+    navigation.navigate("Detalles del formulario", {
+      RespuestaFormularioId: borrador.RespuestaFormularioId,
       FormularioId: borrador.FormularioId,
-      nombre: borrador.Nombre,
-      descripcion: borrador.Descripcion,
-      detalles: borrador.detalles,
-      modo: 'borrador',
-      creacion: borrador.creacion,
-      modificacion: borrador.modificacion
+      nombre: borrador.nombre ?? undefined,
+      descripcion: borrador.descripcion,
+      detalles: borrador.detalles.map(detalle => ({
+        CampoId: detalle.CampoId,
+        valor: detalle.Valor ?? undefined
+      })),
+      modo: "borrador",
+      creacion: borrador.creacion ? new Date(borrador.creacion) : undefined, // Conversión de string a Date
+      modificacion: borrador.modificacion ? new Date(borrador.modificacion) : undefined // Conversión de string a Date
     });
   };
-  
 
-  const handleEliminarBorrador = async (id: string) => {
+
+  const handleEliminarBorrador = async (RespuestaFormularioId: string) => {
     try {
-      const borradoresActualizados = await borrarBorradorOffline(id); // Ahora usa el `id` en lugar del índice
+      const borradoresActualizados = await borrarBorradorOffline(RespuestaFormularioId); // Ahora usa el `id` en lugar del índice
       setBorradores(borradoresActualizados); // Actualiza la lista después de eliminar
     } catch (error) {
       console.error('Error al borrar borrador offline:', error);
@@ -71,14 +76,14 @@ export default function BorradoresScreen() {
 
             return (
               <CardBorrador
-                id={item.id}
+                RespuestaFormularioId={item.RespuestaFormularioId}
                 nombre={nombre}
                 descripcion={descripcion}
                 creacion={item.creacion}
                 modificacion={item.modificacion}
                 imagen={imagen ?? ''}
                 onPress={() => handleSeleccionarBorrador(item)}
-                onDelete={() => handleEliminarBorrador(item.id)} // Pasa el `id` único
+                onDelete={() => handleEliminarBorrador(item.RespuestaFormularioId)} // Pasa el `id` único
               />
             );
           }}

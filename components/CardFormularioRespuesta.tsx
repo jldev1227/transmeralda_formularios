@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { Text, StyleSheet, TouchableWithoutFeedback, Animated, Image, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native'; // <-- Importar
-import { RespuestaFormulario } from 'types';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RespuestaFormulario, RootStackParamList } from 'types';
 import { images } from 'utils/images';
 import IconCheckmarkCircle from './IconCheckmarkCircle';
+import { convertirTimestamp } from 'utils/convertirTimestamp';
+
 
 type CardProps = {
   respuesta: RespuestaFormulario;
 };
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export const CardFormularioRespuesta: React.FC<CardProps> = ({ respuesta }) => {
-  const navigation = useNavigation(); // <-- Hook de navegación
-  const [scale] = useState(new Animated.Value(1)); // Estado inicial de la escala
+  const navigation = useNavigation<NavigationProp>(); // typed navigation
+  const [scale] = useState(new Animated.Value(1));
 
   const handlePressIn = () => {
     Animated.spring(scale, {
@@ -27,13 +32,11 @@ export const CardFormularioRespuesta: React.FC<CardProps> = ({ respuesta }) => {
     }).start();
   };
 
-  // Aquí envías cualquier información que requieras
   const handlePress = () => {
     navigation.navigate('Detalles del formulario', {
       FormularioId: respuesta.formulario.FormularioId,
       nombre: respuesta.formulario.Nombre,
       descripcion: respuesta.formulario.Descripcion,
-      // puedes pasar incluso 'detalles' o lo que sea necesario:
       detalles: respuesta.detalles,
       modo: 'enviado'
     });
@@ -46,17 +49,26 @@ export const CardFormularioRespuesta: React.FC<CardProps> = ({ respuesta }) => {
       onPress={handlePress}
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-        <Image
-          source={images[respuesta.formulario.Imagen ?? '']}
-          style={styles.image}
-        />
+        {respuesta.formulario.Imagen && (
+          <Image
+            source={images[respuesta.formulario.Imagen ?? '']}
+            style={styles.image}
+          />
+        )}
         <View style={styles.textContainer}>
-          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
-            {respuesta.formulario.Nombre}
-          </Text>
-          <Text style={styles.description} numberOfLines={2} ellipsizeMode="tail">
-            {respuesta.formulario.Descripcion}
-          </Text>
+          <View>
+            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+              {respuesta.formulario.Nombre}
+            </Text>
+            <Text style={styles.description} numberOfLines={2} ellipsizeMode="tail">
+              {respuesta.formulario.Descripcion}
+            </Text>
+          </View>
+          <View>
+            <Text style={styles.date} numberOfLines={1} ellipsizeMode="tail">
+              Enviado: {convertirTimestamp(respuesta.createdAt)}
+            </Text>
+          </View>
         </View>
         <IconCheckmarkCircle />
       </Animated.View>
@@ -84,6 +96,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
     justifyContent: 'center',
+    gap: 10
   },
   title: {
     fontSize: 16,
@@ -93,6 +106,9 @@ const styles = StyleSheet.create({
   description: {
     marginTop: 5,
     fontSize: 14,
+    color: '#666',
+  },
+  date: {
     color: '#666',
   },
 });

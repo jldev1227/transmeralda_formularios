@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import LeftArrowCircle from '../components/LeftArrowCircle';
 import { Controller, useForm } from 'react-hook-form';
 import MailIcon from '../components/MailIcon';
@@ -25,16 +25,28 @@ export default function ForgetPassword({ navigation }: any) {
       const response = await solicitarCambioPassword({
         variables: { correo: data.correo },
       });
-  
+
       if (response?.data?.solicitarCambioPassword) {
         Alert.alert(
           "Solicitud exitosa",
-          response.data.solicitarCambioPassword
+          response.data.solicitarCambioPassword,
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Navega al screen NuevoPassword
+                navigation.navigate("NuevoPassword", {
+                  correo: data.correo
+                });
+              },
+            },
+          ],
+          { cancelable: false } // Opcional: evita que cierren el Alert dando clic fuera
         );
       }
     } catch (err: any) {
       console.error("Error en el cliente:", err);
-  
+
       const errorMessage = err?.graphQLErrors?.[0]?.message || "Error inesperado";
       Alert.alert("Error", errorMessage);
     }
@@ -67,6 +79,10 @@ export default function ForgetPassword({ navigation }: any) {
                   placeholderTextColor="#888888"
                   onChangeText={onChange}
                   value={value}
+                  keyboardType="email-address" // Muestra teclado optimizado para correos
+                  autoCapitalize="none" // No capitaliza texto automáticamente
+                  autoComplete="email" // Activa la autocompletación para correos
+                  textContentType="emailAddress" // Sugerencias basadas en correos guardados
                 />
               </View>
             )}
@@ -80,15 +96,24 @@ export default function ForgetPassword({ navigation }: any) {
           </Text>
         </TouchableOpacity>
       </SafeAreaView>
+
+      <View style={{
+        flex: 1
+      }}>
+        <Image
+          style={styles.image}
+          source={require("assets/codi.png")} // Ajusta la ruta de tu imagen
+          resizeMode="contain"
+        />
+      </View>
     </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    width: '100%',
     gap: 10,
-    bac: 'red'
   },
   header: {
     flexDirection: 'row',
@@ -111,7 +136,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#F3F3EC',
+    borderColor: '#e9e9e9',
     padding: 12,
     paddingHorizontal: 10,
     borderRadius: 5,
@@ -135,5 +160,9 @@ const styles = StyleSheet.create({
   buttonSubmitText: {
     color: '#fff',
     textAlign: 'center'
+  },
+  image: {
+    width: 500,
+    height: 350,
   },
 });

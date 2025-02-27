@@ -19,7 +19,13 @@ export default function FormulariosFormatos({ items }) {
                     <CardFormulario
                         key={item.FormularioId}
                         formulario={item}
-                        onPress={() => navigation.navigate("Detalles del formulario", { FormularioId: item.FormularioId })}
+                        onPress={() => navigation.navigate("Detalles del formulario", {
+                            FormularioId: item.FormularioId,
+                            nombre: item.Nombre,
+                            descripcion: item.Descripcion,
+                            categorias: item.categorias,
+                            modo: "nuevo",
+                        })}
                     />
                 )}
                 ListEmptyComponent={<Text style={styles.emptyText}>No hay formatos disponibles.</Text>}
