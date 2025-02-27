@@ -1,70 +1,89 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from "react";
 import {
-  View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, Image, TouchableHighlight, Animated,
-  Keyboard, BackHandler
-} from 'react-native';
-import { useForm, Controller } from 'react-hook-form';
-import { useMutation } from '@apollo/client';
-import * as SecureStore from 'expo-secure-store';
-import * as Yup from 'yup';
-import { yupResolver } from '@hookform/resolvers/yup';
-import { AUTENTICAR_USUARIO } from '../graphql/mutation';
-import RightArrowCircle from 'components/RightArrowCircle';
-import MailIcon from 'components/MailIcon';
-import KeyIcon from 'components/KeyIcon';
-import AuthLayout from '../layouts/AuthLayout';
-import { useAuth } from 'context/AuthContext';
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Alert,
+  TouchableOpacity,
+  Image,
+  TouchableHighlight,
+  Animated,
+  Keyboard,
+  BackHandler,
+} from "react-native";
+import { useForm, Controller } from "react-hook-form";
+import { useMutation } from "@apollo/client";
+import * as SecureStore from "expo-secure-store";
+import * as Yup from "yup";
+import { yupResolver } from "@hookform/resolvers/yup";
+import { AUTENTICAR_USUARIO } from "../graphql/mutation";
+import RightArrowCircle from "components/RightArrowCircle";
+import MailIcon from "components/MailIcon";
+import KeyIcon from "components/KeyIcon";
+import AuthLayout from "../layouts/AuthLayout";
+import { useAuth } from "context/AuthContext";
+import SQLite from "react-native-sqlite-storage";
 
 const schema = Yup.object().shape({
-  correo: Yup.string().email('Correo no válido').required('El correo es obligatorio'),
-  password: Yup.string().min(6, 'Mínimo 6 caracteres').required('La contraseña es obligatoria'),
+  correo: Yup.string()
+    .email("Correo no válido")
+    .required("El correo es obligatorio"),
+  password: Yup.string()
+    .min(6, "Mínimo 6 caracteres")
+    .required("La contraseña es obligatoria"),
 });
 
 export default function LoginScreen({ navigation }: any) {
   const { dispatch } = useAuth();
-
-  const { control, watch, handleSubmit, formState: { errors } } = useForm({
+  const {
+    control,
+    watch,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
     resolver: yupResolver(schema),
   });
 
-  // Estado para controlar si todos los campos están llenos
   const [areFieldsFilled, setAreFieldsFilled] = useState(false);
-
-  const [imageSize] = useState(new Animated.Value(1)); // Escala inicial de la imagen
-
-  // Observar todos los campos en tiempo real
+  const [imageSize] = useState(new Animated.Value(1));
   const fields = watch();
-
-  // Comprobar si todos los campos están llenos
-  useEffect(() => {
-    const allFilled = Object.values(fields).every((field) => {
-      return typeof field === 'string' && field.trim() !== ''; // Verificar que sea una cadena y no esté vacía
-    });
-    setAreFieldsFilled(allFilled);
-  }, [fields]);
-
-
   const [autenticarUsuario, { loading }] = useMutation(AUTENTICAR_USUARIO);
 
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      // Bloquea el botón "Atrás"
-      Alert.alert(
-        'Salir de la aplicación',
-        '¿Deseas salir de la aplicación?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Salir', onPress: () => BackHandler.exitApp() },
-        ]
-      );
-      return true; // Previene la acción predeterminada
-    });
+    const allFilled = Object.values(fields).every(
+      (field) => typeof field === "string" && field.trim() !== ""
+    );
+    setAreFieldsFilled(allFilled);
+  }, [fields]);
 
-    return () => backHandler.remove(); // Limpia el evento
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      Alert.alert("Salir de la aplicación", "¿Deseas salir de la aplicación?", [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Salir", onPress: () => BackHandler.exitApp() },
+      ]);
+      return true;
+    });
+    return () => backHandler.remove();
   }, []);
 
+  const openDatabase = () => {
+    return SQLite.openDatabase(
+      {
+        name: "MyDatabase.db",
+        location: "default",
+      },
+      () => console.log("Base de datos abierta correctamente"),
+      (error) => console.error("Error al abrir la base de datos:", error)
+    );
+  };
+
+
   const onSubmit = async (data: { correo: string; password: string }) => {
+    const db = await openDatabase();
     try {
+      // Autenticar al usuario
       const response = await autenticarUsuario({
         variables: {
           input: {
@@ -77,17 +96,65 @@ export default function LoginScreen({ navigation }: any) {
       const { token, usuario } = response.data.autenticarUsuario;
 
       // Guardar el token en SecureStore
-      await SecureStore.setItemAsync('userToken', token);
+      await SecureStore.setItemAsync("userToken", token);
 
-      Alert.alert('Login exitoso', `Bienvenido, ${usuario.nombre}`);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Formularios' }],
+      // Verificar que `db` esté disponible antes de usarla
+      if (!db) {
+        console.error("Error: La base de datos no está inicializada.");
+        return;
+      }
+
+      // Crear tabla "User" si no existe
+      await db.transaction(async (tx) => {
+        tx.executeSql(
+          `CREATE TABLE IF NOT EXISTS User (
+            id TEXT PRIMARY KEY,
+            nombre TEXT,
+            apellido TEXT,
+            correo TEXT,
+            imagen TEXT,
+            rol TEXT,
+            telefono TEXT
+          )`,
+          [],
+          () => console.log('Tabla "User" creada o ya existente.'),
+          (_, error) => {
+            throw new Error(`Error al crear la tabla "User": ${error.message}`);
+          }
+        );
+
+        // Insertar usuario en la tabla "User"
+        tx.executeSql(
+          `INSERT OR REPLACE INTO User (id, nombre, apellido, correo, imagen, rol, telefono)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            usuario.id,
+            usuario.nombre,
+            usuario.apellido,
+            usuario.correo,
+            usuario.imagen,
+            usuario.rol,
+            usuario.telefono,
+          ],
+          () => console.log('Usuario insertado o actualizado correctamente.'),
+          (_, error) => {
+            throw new Error(`Error al insertar usuario en la tabla "User": ${error.message}`);
+          }
+        );
       });
+
+      // Alert.alert('Login exitoso', `Bienvenido, ${usuario.nombre}`);
+      // navigation.reset({
+      //   index: 0,
+      //   routes: [{ name: 'Formularios' }],
+      // });
       dispatch({ type: 'SET_AUTH', payload: usuario });
+
     } catch (err: any) {
       console.error("Error en el cliente:", err);
-      const errorMessage = err?.graphQLErrors?.[0]?.message || "Error inesperado";
+
+      // Manejo de errores más detallado
+      const errorMessage = err?.graphQLErrors?.[0]?.message || err?.message || "Error inesperado";
       Alert.alert("Error", errorMessage);
     }
   };
@@ -95,14 +162,14 @@ export default function LoginScreen({ navigation }: any) {
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", () =>
       Animated.timing(imageSize, {
-        toValue: 0.75, // Reducir la imagen al 50%
+        toValue: 0.6,
         duration: 150,
         useNativeDriver: true,
       }).start()
     );
     const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () =>
       Animated.timing(imageSize, {
-        toValue: 1, // Restaurar la imagen
+        toValue: 1,
         duration: 150,
         useNativeDriver: true,
       }).start()
@@ -117,24 +184,22 @@ export default function LoginScreen({ navigation }: any) {
   return (
     <AuthLayout>
       <Animated.View
-        style={[
-          styles.imageContainer,
-          { transform: [{ scale: imageSize }] }, // Aplicar escala animada
-        ]}
+        style={[styles.imageContainer, { transform: [{ scale: imageSize }] }]}
       >
         <Image
           style={styles.image}
-          source={require("assets/codi.png")} // Ajusta la ruta de tu imagen
+          source={require("assets/codi.png")}
           resizeMode="contain"
         />
       </Animated.View>
 
-      <View style={{
-        flex: 1,
-      }}>
+      <View style={{ flex: 1 }}>
         <View style={styles.header}>
           <Text style={styles.title}>Ingresa a tu cuenta</Text>
-          <Text style={styles.description}>Gestiona tus tareas y mantén tu información actualizada en Transmeralda, todo desde un solo lugar.</Text>
+          <Text style={styles.description}>
+            Gestiona tus tareas y mantén tu información actualizada en
+            Transmeralda, todo desde un solo lugar.
+          </Text>
         </View>
 
         <View style={styles.fieldContainer}>
@@ -150,15 +215,17 @@ export default function LoginScreen({ navigation }: any) {
                   placeholderTextColor="#888888"
                   onChangeText={onChange}
                   value={value}
-                  keyboardType="email-address" // Muestra teclado optimizado para correos
-                  autoCapitalize="none" // No capitaliza texto automáticamente
-                  autoComplete="email" // Activa la autocompletación para correos
-                  textContentType="emailAddress" // Sugerencias basadas en correos guardados
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  textContentType="emailAddress"
                 />
               </View>
             )}
           />
-          {errors.correo && <Text style={styles.error}>{errors.correo.message}</Text>}
+          {errors.correo && (
+            <Text style={styles.error}>{errors.correo.message}</Text>
+          )}
         </View>
 
         <View style={styles.fieldContainer}>
@@ -171,29 +238,29 @@ export default function LoginScreen({ navigation }: any) {
                 <TextInput
                   style={styles.input}
                   placeholder="Ingresa tu contraseña"
-                  placeholderTextColor={'#888888'}
+                  placeholderTextColor={"#888888"}
                   secureTextEntry
                   onChangeText={onChange}
                   value={value}
+                  autoCapitalize="none"
                 />
               </View>
             )}
           />
-          {errors.password && <Text style={styles.error}>{errors.password.message}</Text>}
+          {errors.password && (
+            <Text style={styles.error}>{errors.password.message}</Text>
+          )}
         </View>
 
         <TouchableOpacity
-          style={[
-            styles.buttonSubmit,
-            !areFieldsFilled && styles.disabledButton, // Aplica estilo si está deshabilitado
-          ]}
+          style={[styles.buttonSubmit, !areFieldsFilled && styles.disabledButton]}
           onPress={handleSubmit(onSubmit)}
-          disabled={!areFieldsFilled} // Deshabilita el botón si los campos no están llenos
+          disabled={!areFieldsFilled}
         >
           <Text
             style={[
               styles.buttonSubmitText,
-              !areFieldsFilled && styles.disabledText, // Cambia el color del texto si está deshabilitado
+              !areFieldsFilled && styles.disabledText,
             ]}
           >
             {loading ? "Cargando..." : "Ingresar"}
@@ -202,17 +269,14 @@ export default function LoginScreen({ navigation }: any) {
 
         <TouchableHighlight
           style={styles.forgetPassword}
-          underlayColor="#DFFFED" // Fondo verde claro al presionar
-          onPress={() => {
-            navigation.navigate('ForgetPassword')
-          }}
+          underlayColor="#DFFFED"
+          onPress={() => navigation.navigate("ForgetPassword")}
         >
           <View style={styles.content}>
             <Text style={styles.forgetPasswordText}>Olvidé mi contraseña</Text>
             <RightArrowCircle />
           </View>
         </TouchableHighlight>
-
       </View>
     </AuthLayout>
   );
@@ -220,77 +284,74 @@ export default function LoginScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   header: {
-    marginBottom: 20
+    marginBottom: 20,
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginVertical: 10,
   },
   description: {
     fontSize: 14,
-    color: '#888888'
+    color: "#888888",
   },
   fieldContainer: {
-    marginBottom: 15
+    marginBottom: 15,
   },
   inputContainer: {
     borderWidth: 1,
-    borderColor: '#F3F3EC',
+    borderColor: "#e9e9e9",
     padding: 12,
     paddingHorizontal: 10,
     borderRadius: 5,
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   input: {
     flex: 1,
   },
   error: {
-    color: 'red',
+    color: "red",
     fontSize: 12,
   },
   buttonSubmit: {
-    backgroundColor: '#2E8B57',
+    backgroundColor: "#2E8B57",
     padding: 15,
-    borderRadius: 8
+    borderRadius: 8,
   },
   buttonSubmitText: {
-    color: '#fff',
-    textAlign: 'center'
+    color: "#fff",
+    textAlign: "center",
   },
   image: {
     width: 500,
     height: 350,
-    marginTop: 'auto'
   },
   forgetPassword: {
-    margin: 'auto',
+    margin: "auto",
     width: 250,
     padding: 10,
-    borderRadius: 30
+    borderRadius: 30,
   },
   content: {
+    flexDirection: "row",
     margin: 'auto',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10
+    alignItems: "center",
+    gap: 10,
   },
   forgetPasswordText: {
     fontSize: 16,
-    color: '#2E8B57',
-    textAlign: 'center'
+    color: "#2E8B57",
+    textAlign: "center",
   },
   imageContainer: {
     flex: 1,
-    marginBottom: 20,
   },
   disabledButton: {
-    backgroundColor: "#eeeeee", // Cambia a un color gris cuando está deshabilitado
+    backgroundColor: "#eeeeee",
   },
   disabledText: {
-    color: "#808080", // Cambia el texto a gris cuando está deshabilitado
-  }
+    color: "#808080",
+  },
 });

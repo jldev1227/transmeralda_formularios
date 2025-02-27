@@ -30,6 +30,13 @@ export const CAMBIAR_PASSWORD = gql`
   }
 `;
 
+export const COMFIRMAR_TOKEN_PASSWORD = gql`
+  mutation ConfirmarTokenPassword($token: String!) {
+    confirmarTokenPassword(token: $token)
+  }
+`;
+
+
 export const REGISTRAR_RESPUESTA_FORMULARIO = gql`
   mutation RegistrarRespuesta($input: RespuestaFormularioInput!) {
     registrarRespuesta(input: $input) {
@@ -51,6 +58,7 @@ export const REGISTRAR_RESPUESTA_FORMULARIO = gql`
         Descripcion
         Imagen
       }
+      createdAt
     }
   }
 `;

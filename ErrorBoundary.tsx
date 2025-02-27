@@ -31,16 +31,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 function ErrorFallback({ errorMessage }: { errorMessage?: string }) {
-  const navigation = useNavigation();
-
+  const navigation = useNavigation()
   const handleNavigateToLogin = () => {
-    navigation.dispatch(
-      CommonActions.reset({
+      navigation.reset({
         index: 0,
-        routes: [{ name: 'Login' }],
-      })
-    );  };
-
+        routes: [{ name: 'Formularios' }],
+      });
+    }
+    
   return (
     <View style={styles.errorContainer}>
       <Text style={styles.errorText}>

@@ -4,34 +4,38 @@ export type RootStackParamList = {
   Formularios: undefined;
   ForgetPassword: undefined;
   NuevoPassword: undefined;
- "Detalles del formulario": {
-    id: string;
-    FormularioId: string;
+  "Detalles del formulario": {
+    RespuestaFormularioId?: string;
+    categorias?: CategoriaType[];
+    FormularioId?: string;
     nombre?: string;
     descripcion?: string;
     detalles?: Array<{
-      CampoId: string;
-      valor: string;
+      CampoId?: string;
+      valor?: string;
     }>;
-    modo?: string;
+    modo?: "nuevo" | "borrador" | "enviado";
+    creacion?: Date;
+    modificacion?: Date;
   };
-  
+  index: undefined;
 };
 
-export type Formulario = {
-  FormularioId: string;
-  Nombre: string; // Nombre del formulario
-  Descripcion: string; // Descripción del formulario
-  Imagen: string,
-  typename?: string
-};
+export type Usuario = {
+  id?: string;
+  nombre?: string;
+  apellido?: string;
+  correo?: string
+  rol?: string
+}
 
 export type RespuestaFormulario = {
   RespuestaFormularioId: string; // ID único del formulario
   FormularioId: string; // ID del formulario al que pertenece la respuesta
   UsuarioId: string | null; // ID del usuario que envió la respuesta (opcional)
   detalles: RespuestaDetalle[]; // Array de detalles relacionados con las respuestas a los campos
-  formulario: Formulario
+  formulario: FormularioType;
+  createdAt: Date
 };
 
 export type RespuestaDetalle = {
@@ -41,23 +45,22 @@ export type RespuestaDetalle = {
   valor: string; // Valor de la respuesta (puede ser texto, boolean, número, etc.)
 };
 
-export type BorradorFormulario = {
-  id: string;
+export interface BorradorFormulario {
+  RespuestaFormularioId?: string;
   FormularioId: string;
-  UsuarioId: string | number | null;
+  UsuarioId: number;
   detalles: {
-    CampoId: string | undefined;
-    valor: string | null;
-  }[];
-  creacion?: String
-};
-
-
-export type Categoria = {
-  nombre: string; // Nombre de la categoría
-  descripcion?: string; // Descripción de la categoría (opcional)
-  campos: CampoType[]; // Array de campos dentro de la categoría
-};
+    RespuestaDetalleId?: string | undefined;
+    CampoId?: string | undefined;
+    Valor?: string | null;
+    valor?: string | null
+  }[];  creacion: string;
+  modificacion?: string;
+  nombre?: string;        // <-- Con el signo de interrogación
+  modo?: 'borrador'|'nuevo'|'enviado';
+  descripcion?: string;
+  estado: "borrador" | "enviado" | "pendiente",
+}
 
 export type OpcionType = {
   OpcionId: number;
@@ -98,6 +101,7 @@ export type FormularioType = {
   Nombre: string;
   Descripcion?: string;
   categorias: CategoriaType[];
+  Imagen?: string
 };
 
 export type Opcion = {

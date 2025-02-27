@@ -17,18 +17,7 @@ export const OBTENER_USUARIO = gql`
 export const OBTENER_FORMULARIOS = gql`
   query ObtenerFormularios {
   obtenerFormularios {
-    FormularioId
-    Nombre
-    Descripcion
-    Imagen
-  }
-}
-`;
-
-export const OBTENER_FORMULARIO = gql`
-  query ObtenerFormulario($id: ID!) {
-    obtenerFormulario(id: $id) {
-      FormularioId
+FormularioId
       Nombre
       Descripcion
       categorias {
@@ -58,8 +47,9 @@ export const OBTENER_FORMULARIO = gql`
           }
         }
       }
-    }
+    Imagen
   }
+}
 `;
 
 export const OBTENER_RESPUESTAS_POR_USUARIO = gql`
@@ -68,6 +58,7 @@ export const OBTENER_RESPUESTAS_POR_USUARIO = gql`
       RespuestaFormularioId
       FormularioId
       UsuarioId
+      createdAt
       formulario {
         FormularioId
         Nombre

@@ -5,18 +5,17 @@ import IconBorrador from './IconBorrador';
 import { formatearFechaPersonalizada } from 'utils/formatearFechaPersonalizada';
 
 interface CardBorradorProps {
-  id: String;
+  RespuestaFormularioId: string;
   nombre: string;
   descripcion: string;
   creacion: string;
   modificacion: string;
   imagen: string | null;
-  item: any;
   onPress?: () => void; // Función opcional a ejecutar al pulsar
   onDelete?: (id: string) => void; // Función opcional a ejecutar al confirmar eliminación
 }
 
-export default function CardBorrador({ id, nombre, descripcion, imagen, creacion, modificacion, onPress, onDelete }: CardBorradorProps) {
+export default function CardBorrador({ RespuestaFormularioId, nombre, descripcion, imagen, creacion, modificacion, onPress, onDelete }: CardBorradorProps) {
   const [scale] = useState(new Animated.Value(1));
 
   const handlePressIn = () => {
@@ -46,7 +45,7 @@ export default function CardBorrador({ id, nombre, descripcion, imagen, creacion
           text: 'Eliminar',
           onPress: () => {
             if (onDelete) {
-              onDelete(id); // Llama a la función de eliminación si está definida
+              onDelete(RespuestaFormularioId); // Llama a la función de eliminación si está definida
             }
           },
         },
@@ -63,10 +62,12 @@ export default function CardBorrador({ id, nombre, descripcion, imagen, creacion
       onLongPress={handleLongPress} // Maneja el long press
     >
       <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-        <Image source={images[imagen ?? '']} style={styles.image} />
+        {imagen && (
+          <Image source={images[imagen ?? '']} style={styles.image} />
+        )}
         <View style={styles.textContainer}>
           <Text style={styles.description} numberOfLines={1} ellipsizeMode="tail">
-            Borrador: {id}
+            Borrador: {RespuestaFormularioId}
           </Text>
           <View>
             <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
@@ -77,12 +78,12 @@ export default function CardBorrador({ id, nombre, descripcion, imagen, creacion
             </Text>
           </View>
           <View>
-            <Text style={styles.description} numberOfLines={1} ellipsizeMode="tail">
-              Fecha de creación: {formatearFechaPersonalizada(creacion)}
+            <Text style={styles.date} numberOfLines={1} ellipsizeMode="tail">
+              Creación: {formatearFechaPersonalizada(creacion)}
             </Text>
             {modificacion && (
-              <Text style={styles.description} numberOfLines={1} ellipsizeMode="tail">
-                Fecha de modificación: {formatearFechaPersonalizada(modificacion)}
+              <Text style={styles.date} numberOfLines={1} ellipsizeMode="tail">
+                Modificación: {formatearFechaPersonalizada(modificacion)}
               </Text>
             )}
           </View>
@@ -125,4 +126,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  date:{
+    color: '#666',
+  }
 });

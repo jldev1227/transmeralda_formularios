@@ -1,11 +1,9 @@
 import React from 'react'
 import { FlatList, StyleSheet, Text, View } from 'react-native'
-import { NavigationProp, useNavigation } from '@react-navigation/native';
-import { RespuestaFormulario, RootStackParamList } from 'types';
+import { RespuestaFormulario } from 'types';
 import { CardFormularioRespuesta } from './CardFormularioRespuesta';
 
 export default function FormulariosRespuestasEnviadas({ items }) {
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   return (
     <View style={{
       flex: 1,
